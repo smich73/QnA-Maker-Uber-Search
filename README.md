@@ -1,2 +1,2 @@
 # QnA-Maker-Uber-Search
-QnA Graph
+QnA Maker Uber Search project 
