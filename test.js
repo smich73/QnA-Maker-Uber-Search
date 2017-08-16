@@ -1,15 +1,17 @@
 var extractTextFromPdf = require("./ExtractTextFromPDF");
 
 var context = {
-    log : function(text)
+    log : function(...text)
     {
-        console.log(text);
+    
+        console.log(...text);
+      
     },
     done : function(){
         console.log("The function is done apparently");
     },
     bindingData : {
-        name : "test payload"
+        name : 'Beebs'
     }
 }
 
