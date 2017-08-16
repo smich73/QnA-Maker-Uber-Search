@@ -1,0 +1,12 @@
+{
+    "bindings": [
+      {
+        "name": "myBlob",
+        "type": "blobTrigger",
+        "direction": "in",
+        "path": "uploads/{name}",
+        "connection": "qnamakerubersstorage_STORAGE"
+      }
+    ],
+    "disabled": false
+  }
