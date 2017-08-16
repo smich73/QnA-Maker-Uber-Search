@@ -5,7 +5,7 @@ module.exports = function (context, myBlob) {
      const { spawn } = require('child_process');
     //const bat = exec('cmd.exe', ['D:\home\site\wwwroot\BlobTriggerJS1\pdftotext.exe -h']);
 
-    fs.writeFile(myBlob.name, myBlob, function (err) {
+    fs.writeFile("sample.pdf", myBlob, function (err) {
         if (err) return context.log(err); context.done();
         context.log('File Written');
 
