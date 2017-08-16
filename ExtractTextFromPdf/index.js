@@ -1,7 +1,14 @@
 module.exports = function (context, myBlob) {
+    var fs = require('fs');
+
     context.log("Trigger from git \n Name:", context.bindingData.name, "\n Blob Size:", myBlob.length, "Bytes");
      const { spawn } = require('child_process');
     //const bat = exec('cmd.exe', ['D:\home\site\wwwroot\BlobTriggerJS1\pdftotext.exe -h']);
+
+    fs.writeFile("sample.pdf", myBlob, function (err) {
+        if (err) return console.log(err);
+        console.log('File Written');
+
     var cp = spawn(process.env.comspec, ['/c', 'pdftotext.exe -nodiag sample.pdf sample.txt']);
 
     cp.stdout.on("data", function(data) {
@@ -20,7 +27,7 @@ module.exports = function (context, myBlob) {
 
     cp.on('close', (code) => {
         context.log(`child process exited with code ${code}`);
-        var fs = require('fs');
+        
         var array = fs.readFileSync('sample.txt').toString().split("\n");
         for(i in array) {
             context.log(array[i]);
@@ -28,4 +35,6 @@ module.exports = function (context, myBlob) {
        
         context.done();
       });
+
+    });
 };

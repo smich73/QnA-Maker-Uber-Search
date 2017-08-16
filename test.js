@@ -19,4 +19,8 @@ var myBlob = {
     length : 12345
 }
 
-var response = extractTextFromPdf(context, myBlob);
+var fs = require('fs');
+fs.readFile('anxiety.pdf', function(err, myBlob) {
+    var response = extractTextFromPdf(context, myBlob);
+});
+
