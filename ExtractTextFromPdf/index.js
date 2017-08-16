@@ -10,6 +10,7 @@ module.exports = function (context, myBlob) {
         if (err) return context.log(err); context.done();
         context.log('File Written');
         child_process.execSync("sleep 5");
+        context.log('Woke Sleep');
     var cp = spawn(process.env.comspec, ['/c', `${workingDirectory}pdftotext.exe -nodiag ${workingDirectory}sample.pdf ${workingDirectory}sample.txt`]);
 
     cp.stdout.on("data", function(data) {
