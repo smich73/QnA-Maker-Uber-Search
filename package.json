@@ -1,0 +1,24 @@
+{
+  "name": "ubersearch",
+  "version": "1.0.0",
+  "description": "QnA Maker Uber Search project",
+  "main": "createQnAs.js",
+  "dependencies": {
+    "azure-storage": "^2.3.0",
+    "request": "^2.81.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smich73/QnA-Maker-Uber-Search.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/smich73/QnA-Maker-Uber-Search/issues"
+  },
+  "homepage": "https://github.com/smich73/QnA-Maker-Uber-Search#readme"
+}
