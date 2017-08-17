@@ -6,28 +6,12 @@ module.exports = function (context, myBlob, ...additional) {
     var options = { encoding: 'UTF-8' };
     if (additional.length > 0){
         var workingDirectory = additional[0];
-    }
-
-    function decodeBase64Image(dataString) {   
-        var matches = dataString.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/),
-        response = {};
-
-        if (matches.length !== 3) {
-            return new Error('Invalid input string');   
-        }
-
-        response.type = matches[1];   
-        response.data = new Buffer(matches[2], 'base64');
-
-        return response; 
-    }
-
-   
+    }     
 
     context.log("Trigger from git \n Name:", context.bindingData.name, "\n Blob Size:", myBlob.length, "Bytes");
      const { spawn } = require('child_process');
     //const bat = exec('cmd.exe', ['D:\home\site\wwwroot\BlobTriggerJS1\pdftotext.exe -h']);
-    var imageBuffer = decodeBase64Image(myBlob);
+    var buf = new Buffer(myBlob, 'base64'); // decode
     fs.writeFile(`${workingDirectory}${tempFileName}`, imageBuffer, options, function (err) {
         if (err) {return 
             context.log("Failed"); 
