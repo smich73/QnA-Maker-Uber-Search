@@ -12,7 +12,7 @@ module.exports = function (context, myBlob, ...additional) {
      const { spawn } = require('child_process');
     //const bat = exec('cmd.exe', ['D:\home\site\wwwroot\BlobTriggerJS1\pdftotext.exe -h']);
     var buf = new Buffer(myBlob, 'base64'); 
-    fs.writeFile(`${workingDirectory}${tempFileName}`, imageBuffer, options, function (err) {
+    fs.writeFile(`${workingDirectory}${tempFileName}`, buf, options, function (err) {
         if (err) {return 
             context.log("Failed"); 
             context.log(err); 
