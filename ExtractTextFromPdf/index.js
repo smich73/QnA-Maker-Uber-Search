@@ -15,16 +15,12 @@ module.exports = function (context, myBlob) {
 
     cp.stdout.on("data", function(data) {
         var str = "Out: " + data.toString();
-        context.log(str);
-        context.done();
-        
+        context.log(str);       
     });
 
     cp.stderr.on("data", function(data) {
         var str = "Error: " + data.toString();
         context.log(str);
-
-        context.done();
     });
 
     cp.on('close', (code) => {
