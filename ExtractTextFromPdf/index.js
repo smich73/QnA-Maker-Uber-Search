@@ -12,31 +12,38 @@ module.exports = function (context, myBlob, ...additional) {
     //const bat = exec('cmd.exe', ['D:\home\site\wwwroot\BlobTriggerJS1\pdftotext.exe -h']);
 
     fs.writeFile(workingDirectory + "sample.pdf", myBlob, function (err) {
-        if (err) return context.log(err); context.done();
-        context.log('File Written');
-        context.log('Woke Sleep');
-    var cp = spawn(process.env.comspec, ['/c', `${workingDirectory}pdftotext.exe -nodiag ${workingDirectory}${tempFileName} ${workingDirectory}${tempOutputFileName}`]);
-
-    cp.stdout.on("data", function(data) {
-        var str = "Out: " + data.toString();
-        context.log(str);       
-    });
-
-    cp.stderr.on("data", function(data) {
-        var str = "Error: " + data.toString();
-        context.log(str);
-    });
-
-    cp.on('close', (code) => {
-        context.log(`child process exited with code ${code}`);
-        
-        var array = fs.readFileSync(`${workingDirectory}${tempOutputFileName}`).toString().split("\n");
-        for(i in array) {
-            context.log(array[i]);
+        if (err) {return 
+            context.log("Failed"); 
+            context.log(err); 
+            context.done();
         }
-       
-        context.done();
-      });
+        
+        context.log('File Written');
+        
+        context.log('Sending Command');
+        var cp = spawn(process.env.comspec, ['/c', `${workingDirectory}pdftotext.exe -nodiag ${workingDirectory}${tempFileName} ${workingDirectory}${tempOutputFileName}`]);
 
+        cp.stdout.on("data", function(data) {
+            var str = "Out: " + data.toString();
+            context.log(str);       
+        });
+
+        cp.stderr.on("data", function(data) {
+            var str = "Error: " + data.toString();
+            context.log(str);
+        });
+
+        cp.on('close', (code) => {
+            context.log(`child process exited with code ${code}`);
+            
+            var array = fs.readFileSync(`${workingDirectory}${tempOutputFileName}`).toString().split("\n");
+            for(i in array) {
+                context.log(array[i]);
+            }
+        
+            context.done();
+        });
+
+        context.log('Closing?');
     });
 };
