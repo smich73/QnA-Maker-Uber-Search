@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "dependencies": {
+    "nodeunit": "^0.11.1",
     "pdftotextjs": "^0.4.0"
   },
   "devDependencies": {},

@@ -40,7 +40,7 @@ module.exports = function (context, myBlob, ...additional) {
             for(i in array) {
                 context.log(array[i]);
             }
-        
+            context.log('It Worked');
             context.done();
         });
 
