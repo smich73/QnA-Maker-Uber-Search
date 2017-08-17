@@ -9,8 +9,7 @@ module.exports = function (context, myBlob, ...additional) {
     }     
 
     context.log("Trigger from git \n Name:", context.bindingData.name, "\n Blob Size:", myBlob.length, "Bytes");
-     const { spawn } = require('child_process');
-    //const bat = exec('cmd.exe', ['D:\home\site\wwwroot\BlobTriggerJS1\pdftotext.exe -h']);
+    const { spawn } = require('child_process');
     var buf = new Buffer(myBlob, 'base64'); 
     fs.writeFile(`${workingDirectory}${tempFileName}`, buf, options, function (err) {
         if (err) {return 
