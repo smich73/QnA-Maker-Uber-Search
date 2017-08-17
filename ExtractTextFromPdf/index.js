@@ -19,7 +19,7 @@ module.exports = function (context, myBlob, ...additional) {
             context.done();
         }
         
-        context.log('File Written');
+        context.log('File Written as UTF8');
         
         context.log('Sending Command');
         var cp = spawn(process.env.comspec, ['/c', `${workingDirectory}pdftotext.exe -nodiag ${workingDirectory}${tempFileName} ${workingDirectory}${tempOutputFileName}`]);
