@@ -3,6 +3,7 @@ module.exports = function (context, myBlob, ...additional) {
     var workingDirectory = "D:\\home\\site\\wwwroot\\"
     var tempFileName = "temp3213231.pdf";
     var tempOutputFileName = "temp3213231.txt"
+    var options = { encoding: 'UTF-8' };
     if (additional.length > 0){
         var workingDirectory = additional[0];
     }
@@ -11,7 +12,7 @@ module.exports = function (context, myBlob, ...additional) {
      const { spawn } = require('child_process');
     //const bat = exec('cmd.exe', ['D:\home\site\wwwroot\BlobTriggerJS1\pdftotext.exe -h']);
 
-    fs.writeFile(`${workingDirectory}${tempFileName}`, myBlob, function (err) {
+    fs.writeFile(`${workingDirectory}${tempFileName}`, myBlob, options, function (err) {
         if (err) {return 
             context.log("Failed"); 
             context.log(err); 
