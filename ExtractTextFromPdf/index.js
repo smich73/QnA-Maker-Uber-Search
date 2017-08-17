@@ -1,6 +1,8 @@
 module.exports = function (context, myBlob, ...additional) {
     var fs = require('fs');
     var workingDirectory = "D:\\home\\site\\wwwroot\\"
+    var tempFileName = "temp3213231.pdf";
+    var tempOutputFileName = "temp3213231.txt"
     if (additional.length > 0){
         var workingDirectory = additional[0];
     }
@@ -13,7 +15,7 @@ module.exports = function (context, myBlob, ...additional) {
         if (err) return context.log(err); context.done();
         context.log('File Written');
         context.log('Woke Sleep');
-    var cp = spawn(process.env.comspec, ['/c', `${workingDirectory}pdftotext.exe -nodiag ${workingDirectory}sample.pdf ${workingDirectory}sample.txt`]);
+    var cp = spawn(process.env.comspec, ['/c', `${workingDirectory}pdftotext.exe -nodiag ${workingDirectory}${tempFileName} ${workingDirectory}${tempOutputFileName}`]);
 
     cp.stdout.on("data", function(data) {
         var str = "Out: " + data.toString();
@@ -28,7 +30,7 @@ module.exports = function (context, myBlob, ...additional) {
     cp.on('close', (code) => {
         context.log(`child process exited with code ${code}`);
         
-        var array = fs.readFileSync(`${workingDirectory}sample.txt`).toString().split("\n");
+        var array = fs.readFileSync(`${workingDirectory}${tempOutputFileName}`).toString().split("\n");
         for(i in array) {
             context.log(array[i]);
         }
