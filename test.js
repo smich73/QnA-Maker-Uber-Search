@@ -21,6 +21,6 @@ var myBlob = {
 
 var fs = require('fs');
 fs.readFile('anxiety.pdf', function(err, myBlob) {
-    var response = extractTextFromPdf(context, myBlob);
+    var response = extractTextFromPdf(context, myBlob, "");
 });
 
