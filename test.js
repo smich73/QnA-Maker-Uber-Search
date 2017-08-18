@@ -70,7 +70,6 @@ Does the parser
 support questions over two lines?
 Anim eu deserunt ex irure velit aute id deserunt ea pariatur. Cillum tempor magna consectetur amet mollit veniam velit tempor fugiat sit tempor laboris. Velit ad eu non labore officia officia quis proident exercitation dolore. Labore tempor id enim commodo dolore sit. Aute fugiat id occaecat Lorem ut excepteur magna consectetur ipsum ut id.
 Labore mollit sit nisi laborum culpa.
-
 `
 
 exports.testConvertTextToQuestions = function(test) {  
