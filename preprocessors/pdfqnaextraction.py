@@ -6,6 +6,7 @@ import os
 import re
 import spacy
 import json
+import time
 from multiprocessing import Pool
 from requests import get
 from pdfminer.pdfdocument import PDFDocument
@@ -67,6 +68,7 @@ class QnaDoc:
         self.name = name
         self.url = url
         self.questions = list()
+        self.metadata = list()
     
     def addPair(self, pair):
         self.questions.append(pair)
@@ -75,19 +77,29 @@ class QnaDoc:
         fp = open(str.format("{}.json", filename), "w")
         return json.dump(self.__dict__, fp, default=encode_qnaPair)
 
+    def addMetadata(self, k, v):
+        self.metadata.append(KeyValue(k,v))
+
 class QnaPair:
     def __init__(self, question):    
         self.question = question
         self.answer = ""
         self.source = ""
+        self.metadata = list()
 
     def addAnswerText(self, text):
         self.answer += text
 
+    def addMetadata(self, k, v):
+        self.metadata.append(KeyValue(k,v))
+
+class KeyValue:
+    def __init__(self, key, value):
+        self.key = key
+        self.value = value
+
 def encode_qnaPair(obj):
-    if isinstance(obj, QnaPair):
-        return obj.__dict__
-    return obj
+    return obj.__dict__
 
 # Very basic!
 def extractQuestions(row): 
@@ -97,11 +109,14 @@ def extractQuestions(row):
     txt = fp.read()
     nlpDoc = nlp(txt.decode("utf8"))
     qnadoc = QnaDoc(row[0], row[1], row[2])
+    qnadoc.addMetadata("Created", time.strftime("%H:%M:%S %m/%d/%Y"))
     pair = QnaPair("Intro")
     for sent in nlpDoc.sents:
         if "?" in sent.text:
+            pair.addMetadata("EndPosition", str(sent.end))
             qnadoc.addPair(pair)
             pair = QnaPair(sent.text)
+            pair.addMetadata("StartPosition", str(sent.start))
         else:
             pair.addAnswerText(sent.text)
     qnadoc.saveJson(filename)
@@ -120,10 +135,12 @@ f = open(os.path.join(dataDir, 'PDFs.csv'))
 reader = csv.reader(f, 'excel')
 rows = list(reader)
 
+extractQuestions(rows[0])
+
 p = Pool(4)
 try:
-    p.map(getItem, rows)
-    p.map(extractText, rows)
+    # p.map(getItem, rows)
+    # p.map(extractText, rows)
     p.map(extractQuestions, rows)
 except KeyboardInterrupt:
         # **** THIS PART NEVER EXECUTES. ****
