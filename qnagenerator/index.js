@@ -77,6 +77,7 @@ function getKeywords(text, numberOfKeywords) {
     return keywords;
 }
 
+// Assumes input is array of questions or answers or whatever
 function getWords(text) {
 
     var words = [];
@@ -154,6 +155,7 @@ function createQnACollection(questions, answers, conditionName, source) {
 
         getIntent(asasdad, questions[i], function (result){
 
+            //TODO: Check for errors first
             var qna = {
                 "answer": answers[i],
                 "questions": [
@@ -166,8 +168,12 @@ function createQnACollection(questions, answers, conditionName, source) {
                         "value": result
                     },
                     {
-                        "name": "condition",
-                        "value": conditionName //TODO: Get entities from LUIS instead?
+                        "name": "parentCondition",
+                        "value": conditionName
+                    },
+                    {
+                        "name": "subject",
+                        "value": subject
                     }
                 ]
             };

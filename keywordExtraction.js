@@ -1,69 +1,61 @@
-function extractKeywordsFromTSV(stopwordURL, tsvURL, numberOfWords){
+var stopwords;
 
-    getTextFromURL(stopwordURL, function(result){
+getTextFromURL(stopwordURL, function(result){
 
-        var stopwords = result.replace(/["]+/g, '').replace(/[\n]+/g, '').split('\r');
-        
-        getTextFromURL(tsvURL, function(result){
-            
-            var topWords = calculateKeywordDensity(result, stopwords, numberOfWords);
-        });
+    stopwords = result.replace(/["]+/g, '').replace(/[\n]+/g, '').split('\r');
+
+    getTextFromURL(docURL, function(result){
+        var keywords = getKeywords(result, 10);
     });
-}
+});
 
-function getTextFromURL(url, callback){
+function getTextFromURL(url, callback) {
 
     var request = require('request');
 
     request.get(url,function (error, response, body) {
 
-        if (!error && response.statusCode == 200) {
+        if (!error && response.statusCode === 200) {
 
             callback(body);
         }
     });
 }
 
-function getWordsFromTSV(tsv, stopwords){
+function getKeywords(text, numberOfKeywords) {
 
-    var linesOfText = tsv.split('\n');
+    var words = getWords(text);
 
-    var answers = [];
+    var countedWords = countWords(words);
 
-    for (var i = 0; i < linesOfText.length; i++){
+    var keywords = getTopWords(countedWords, numberOfKeywords);
 
-        var line = linesOfText[i].split('\t');
+    return keywords;
+}
 
-            //questions.push(line[0]);
-            answers.push(line[1]);
-            //conditions.push(line[2]);
-            //sources.push(line[3]);
-    }
+function getWords(text) {
 
     var words = [];
 
-    for (var i = 0; i < answers.length - 1; i++){
+    var allWords = text.replace(/[0-9]/g, '').split(' ');
 
-        var allWords = answers[i].replace(/[0-9]/g, '').split(' ');
+    for (var j = 0; j < allWords.length; j++){
 
-        for (var j = 0; j < allWords.length; j++){
+        var word = allWords[j].toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_~()]/g,"").replace(/\s{2,}/g,"");
 
-            var word = allWords[j].toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_~()]/g,"").replace(/\s{2,}/g,"");
+        if (stopwords.indexOf(word) === -1 && word !== ''){
 
-            if (stopwords.indexOf(word) === -1 && word !== ''){
-
-                words.push(word);
-            }
+            words.push(word);
         }
     }
 
     return words;
 }
 
-function countWords(words){
+function countWords(words) {
     var wordCount = {};
 
-    for(var i = 0; i < words.length; i++)
+    for (var i = 0; i < words.length; i++)
     {
 
         var word = words[i];
@@ -71,9 +63,7 @@ function countWords(words){
         if(wordCount[word] == null){
 
             wordCount[word] = 1;
-        }
-            
-        else{
+        } else {
 
             wordCount[word]++;
         }
@@ -82,7 +72,7 @@ function countWords(words){
     return wordCount;
 }
 
-function getTopWords(countedWords, numberOfWords){
+function getTopWords(countedWords, numberOfWords) {
     var sortedWords = [];
 
     for (var word in countedWords) {
@@ -97,6 +87,8 @@ function getTopWords(countedWords, numberOfWords){
         return b[1] - a[1];
     });
 
+    console.log(sortedWords);
+
     var topWords = [];
 
     for (var i = 0; i < numberOfWords; i++){
@@ -105,17 +97,6 @@ function getTopWords(countedWords, numberOfWords){
     }
 
     console.log("Top " + numberOfWords + " words:\n" + topWords);
-
-    return topWords;
-}
-
-function calculateKeywordDensity(tsv, stopwords, numberOfWords){
-
-    var words = getWordsFromTSV(tsv, stopwords);
-    
-    var countedWords = countWords(words);
-
-    var topWords = getTopWords(countedWords, numberOfWords);
 
     return topWords;
 }
