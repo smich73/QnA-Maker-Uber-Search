@@ -16,7 +16,9 @@ from requests import get
 
 nlp = spacy.load('en_core_web_md')
 
-dataDir = ""
+dataDir = os.environ["PDATA_DIR"]
+
+print(str.format("Using data dir:{}", dataDir))
 
 def getFileName(row):
     leafletTitle = re.sub(r'[^\w]', ' ', row[1])
