@@ -14,7 +14,7 @@ from spacy.symbols import nsubj, VERB
 from collections import Counter
 from requests import get
 
-nlp = spacy.load('en_core_web_md')
+nlp = spacy.load('en')
 
 dataDir = os.environ["PDATA_DIR"]
 
@@ -140,14 +140,13 @@ def enrichQnA(qnaDoc):
     
     qnaDoc.addMetadata("DocumentKeywords", extractKeywords(allwords, 10)) # Overall document keywords
     
-    print(qnaDoc)
     return qnaDoc
 
 # Very basic!
 def extractQuestions(row): 
     filename = getFileName(row)
     txtFileName = ("{}.txt".format(getFileName(row)))
-    fp = file(txtFileName, 'rb')
+    fp = open(txtFileName, 'rb')
     txt = fp.read()
     nlpDoc = nlp(txt.decode("utf8"))
     qnadoc = QnaDoc(row[0], row[1], row[2])
