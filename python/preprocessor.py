@@ -112,12 +112,13 @@ def extractKeywords(text, number):
     text = re.sub('\d',' ', text)
     text = re.sub('[^a-zA-Z0-9^\w\s \']',' ', text) 
 
-    text = text.split(' ')
+    processedText = nlp(text)
+    #text = text.split(' ')
     words = []
 
-    for word in text:
-        if not nlp.vocab[word].is_stop and word != '':
-            words.append(word)
+    for word in processedText:
+        if not nlp.vocab[word.lemma_].is_stop and word.lemma_ != '' and not word.lemma_.isspace() and word.lemma_ != '-PRON-' and word.lemma_ != "'":
+            words.append(word.lemma_)
 
     sortedWords = Counter(words)
 
@@ -132,39 +133,45 @@ def enrichQnA(qnaDoc):
     allwords = ""
 
     for question in qnaDoc.questions:
-        question.addMetadata("AnswerKeywords", extractKeywords(question.answer, 5)) # Answer keywords
-        question.addMetadata("QuestionSubject", extractKeywords(question.question, 1)) # Question subject
+        question.addMetadata("AnswerKeywords", extractKeywords(question.answer, 5))
+        question.addMetadata("MedicalSubject", extractKeywords(question.question, 1))
 
         allwords += question.question
         allwords += question.answer
     
-    qnaDoc.addMetadata("DocumentKeywords", extractKeywords(allwords, 10)) # Overall document keywords
+    qnaDoc.addMetadata("DocumentKeywords", extractKeywords(allwords, 10))
 
     return qnaDoc
 
 # Very basic!
 def extractQuestions(row): 
-    filename = getFileName(row)
-    txtFileName = ("{}.txt".format(getFileName(row)))
-    fp = open(txtFileName, 'rb')
-    txt = fp.read()
-    nlpDoc = nlp(txt.decode("utf8"))
-    qnadoc = QnaDoc(row[0], row[1], row[2])
-    qnadoc.addMetadata("Created", time.strftime("%H:%M:%S %m/%d/%Y"))
-    pair = QnaPair("Intro")
-    for sent in nlpDoc.sents:
-        if "?" in sent.text:
-            pair.addMetadata("EndPosition", str(sent.end))
-            qnadoc.addPair(pair)
-            pair = QnaPair(sent.text)
-            pair.addMetadata("StartPosition", str(sent.start))
-        else:
-            pair.addAnswerText(sent.text)
-    
-    qnadoc = enrichQnA(qnadoc)
-    qnadoc.saveJson(filename)
+    try:
+        filename = getFileName(row)
+        txtFileName = ("{}.txt".format(getFileName(row)))
+        fp = open(txtFileName, 'rb')
+        txt = fp.read()
+        nlpDoc = nlp(txt.decode("utf8"))
+        qnadoc = QnaDoc(row[0], row[1], row[2])
+        qnadoc.addMetadata("Created", time.strftime("%H:%M:%S %m/%d/%Y"))
+        pair = QnaPair("Intro")
+        for sent in nlpDoc.sents:
+            if "?" in sent.text:
+                pair.addMetadata("EndPosition", str(sent.end))
+                qnadoc.addPair(pair)
+                pair = QnaPair(sent.text)
+                pair.addMetadata("StartPosition", str(sent.start))
+            else:
+                pair.addAnswerText(sent.text)
+        
+        qnadoc = enrichQnA(qnadoc)
+        qnadoc.saveJson(filename)
+        return qnadoc
+    except FileNotFoundError as inst:
+        textFile = filename.split('/')
+        print("Error: File not found:", textFile[-1])
 
-    return qnadoc
+    except Exception as inst:
+        print(inst)
 
 def extractVerb(sent):
     for possible_subject in sent:
@@ -191,7 +198,5 @@ except KeyboardInterrupt:
     p.terminate()
     print ("You cancelled the program!")
     sys.exit(1)
-except:
-    print("Oops")
 
 print ("Done")

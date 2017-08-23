@@ -18,12 +18,14 @@ def extractKeywords(text, number):
     text = re.sub('\d',' ', text)
     text = re.sub('[^a-zA-Z0-9^\w\s \']',' ', text) 
 
-    text = text.split(' ')
+    processedText = nlp(text)
+    #text = text.split(' ')
     words = []
 
-    for word in text:
-        if not nlp.vocab[word].is_stop and word != '':
-            words.append(word)
+    for word in processedText:
+        if not nlp.vocab[word.lemma_].is_stop and word.lemma_ != '' and not word.lemma_.isspace() and word.lemma_ != '-PRON-' and word.lemma_ != "'":
+            words.append(word.lemma_)
+            #print(word.lemma_)
 
     sortedWords = Counter(words)
 
@@ -52,3 +54,6 @@ def updateJSON(jsonURL):
 
 def getTextFromURL(url):
     return urllib.request.urlopen(url).read().decode("utf8")
+
+populateStopwords("https://qnageneratorstorage.blob.core.windows.net/stopwords/customStopwords.txt")
+updateJSON("https://qnageneratorstorage.blob.core.windows.net/qnadocs/4194_Tricyclic%20Antidepressants.pdf.json")
