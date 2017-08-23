@@ -16,7 +16,18 @@ from requests import get
 
 nlp = spacy.load('en')
 
-dataDir = ""
+def getTextFromURL(url):
+    return urllib.request.urlopen(url).read().decode("utf8")
+
+def populateStopwords(stopwordURL):
+    stopwords = getTextFromURL(stopwordURL)
+    stopwords = stopwords.replace('"', '').replace('\n', '').split("\r")
+
+    for line in stopwords:
+        nlp.vocab[line].is_stop = True
+
+dataDir = "/mnt/c/Users/anraman/Microsoft/Lawrence Gripper - Docs"
+stopwords = populateStopwords("https://qnageneratorstorage.blob.core.windows.net/stopwords/customStopwords.txt")
 
 def getFileName(row):
     leafletTitle = re.sub(r'[^\w]', ' ', row[1])
@@ -94,13 +105,6 @@ class KeyValue:
 def encode_qnaPair(obj):
     return obj.__dict__
 
-def populateStopwords(stopwordURL):
-    stopwords = getTextFromURL(stopwordURL)
-    stopwords = stopwords.replace('"', '').replace('\n', '').split("\r")
-
-    for line in stopwords:
-        nlp.vocab[line].is_stop = True
-
 def extractKeywords(text, number):
     text = text.replace('\n', ' ').replace('\r', ' ').replace('"', ' ').lower()
     text = re.sub('\d',' ', text)
@@ -118,26 +122,22 @@ def extractKeywords(text, number):
     keywords = ""
     sortedWords = sortedWords.most_common(number)
     for word in sortedWords:
-        keywords += ", " + word[0]
-    
+        keywords += "," + word[0]
+
     return keywords[1:]
 
-def getTextFromURL(url):
-    return urllib.request.urlopen(url).read().decode("utf8")
-
 def enrichQnA(qnaDoc):
-    populateStopwords("https://qnageneratorstorage.blob.core.windows.net/stopwords/customStopwords.txt")
     allwords = ""
 
     for question in qnaDoc.questions:
-        question.addMetadata("AnswerKeywords", extractKeywords(question.question, 5)) # Answer keywords
-        question.addMetadata("QuestionSubject", extractKeywords(question.answer, 1)) # Question subject
+        question.addMetadata("AnswerKeywords", extractKeywords(question.answer, 5)) # Answer keywords
+        question.addMetadata("QuestionSubject", extractKeywords(question.question, 1)) # Question subject
 
         allwords += question.question
         allwords += question.answer
     
     qnaDoc.addMetadata("DocumentKeywords", extractKeywords(allwords, 10)) # Overall document keywords
-    
+
     return qnaDoc
 
 # Very basic!
@@ -159,14 +159,10 @@ def extractQuestions(row):
         else:
             pair.addAnswerText(sent.text)
     
+    qnadoc = enrichQnA(qnadoc)
     qnadoc.saveJson(filename)
 
-    qnadoc = enrichQnA(qnadoc)
-
     return qnadoc
-
-
-    
 
 def extractVerb(sent):
     for possible_subject in sent:
@@ -193,6 +189,7 @@ except KeyboardInterrupt:
     p.terminate()
     print ("You cancelled the program!")
     sys.exit(1)
-
+except:
+    print("Oops")
 
 print ("Done")
