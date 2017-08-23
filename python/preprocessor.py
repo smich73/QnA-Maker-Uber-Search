@@ -26,7 +26,9 @@ def populateStopwords(stopwordURL):
     for line in stopwords:
         nlp.vocab[line].is_stop = True
 
-dataDir = "/mnt/c/Users/anraman/Microsoft/Lawrence Gripper - Docs"
+dataDir = os.environ["PDATA_DIR"]
+print(str.format("Using data dir:{}", dataDir))
+
 stopwords = populateStopwords("https://qnageneratorstorage.blob.core.windows.net/stopwords/customStopwords.txt")
 
 def getFileName(row):
