@@ -266,10 +266,10 @@ rows = list(reader)
 
 # extractQuestions(rows[0])
 
-p = Pool(1)
+p = Pool(4)
 try:
-    # p.map(getItem, rows)
-    # p.map(extractText, rows)
+    p.map(getItem, rows)
+    p.map(extractText, rows)
     docs = p.map(extractQuestions, rows)
     findSimilarQuestions(docs, simdoc=simKeywordsDoc)    
     for doc in docs:
