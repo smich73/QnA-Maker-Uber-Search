@@ -9,15 +9,18 @@ import time
 import spacy
 import urllib.request
 import pdfminer
+
 from multiprocessing import Pool
-from spacy.symbols import nsubj, VERB
 from collections import Counter
 from requests import get
-from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
-from pdfminer.pdfdevice import TagExtractor
-from pdfminer.converter import XMLConverter, HTMLConverter, TextConverter
-from pdfminer.layout import LAParams
-from pdfminer.pdfpage import PDFPage
+
+
+
+#Started trying to split this out into nicer small files 
+import compare 
+import pdf
+from models import QnaDoc, RelatedDoc, QnaPair
+
 
 nlp = spacy.load('en')
 
@@ -53,83 +56,6 @@ def getItem(row):
             response = get(row[2])
             file.write(response.content)
 
-def extractText(row):
-    try:
-        filename = getFileName(row)
-        print ("Extracting {}".format(filename))
-        outputFileName = ("{}.txt".format(getFileName(row)))
-
-        if os.path.exists(outputFileName):
-            return
-
-        fp = open(filename, 'rb')
-        output = open(outputFileName, 'w')
-        rsrcmgr = PDFResourceManager()
-        laparams = LAParams()
-        device = TextConverter(rsrcmgr, output, laparams=laparams)
-        interpreter = PDFPageInterpreter(rsrcmgr, device)
-        for page in PDFPage.get_pages(fp):
-            # page.rotate = (page.rotate + rotation) % 360
-            interpreter.process_page(page)
-        fp.close()
-        device.close()
-    
-    except FileNotFoundError as inst:
-        textFile = filename.split('/')
-        print("Error: File not found:", textFile[-1])
-
-    except Exception as inst:
-        print(inst)
-
-class QnaDoc:
-    def __init__(self, docId, name, url, filename):
-        self.id = docId
-        self.name = name
-        self.url = url
-        self.filename = filename
-        self.questions = list()
-        self.metadata = {}
-        self.related = list()
-    
-    def addPair(self, pair):
-        self.questions.append(pair)
-    
-    def saveJson(self):
-        jsonfn = "{}.json".format(self.filename)
-        print("Saving json to:", jsonfn)
-        fp = open(jsonfn, "w")
-        return json.dump(self.__dict__, fp, default=encode_qnaPair)
-
-    def addMetadata(self, k, v):
-        self.metadata[k] = v
-
-    def addRelatedDoc(self, relatedqna, count, commmonwords):
-        self.related.append(RelatedDoc(relatedqna, count, commmonwords))
-
-class RelatedDoc:
-    def __init__(self, qnadoc, count, commmonwords):
-        self.id = qnadoc.id
-        self.name = qnadoc.name
-        self.url = qnadoc.url
-        self.count = count
-        self.commmonwords = commmonwords
-
-class QnaPair:
-    def __init__(self, question):    
-        self.question = question
-        self.answer = ""
-        self.source = ""
-        self.metadata = {}
-
-    def addAnswerText(self, text):
-        self.answer += text
-
-    def addMetadata(self, k, v):
-        self.metadata[k] = v
-
-def encode_qnaPair(obj):
-    #Todo: Add code to ignore questionnlp field
-    return obj.__dict__
 
 def extractKeywords(text, number):
     text = text.replace('\n', ' ').replace('\r', ' ').replace('"', ' ').lower()
@@ -198,46 +124,6 @@ def extractQuestions(row):
         print(inst)
         return None
 
-def extractVerb(sent):
-    for possible_subject in sent:
-        if possible_subject.dep == nsubj and possible_subject.head.pos == VERB:
-            print(possible_subject.head_)
-    for word in sent:
-        print(word.text, word.lemma, word.lemma_, word.tag, word.tag_, word.pos, word.pos_)
-
-def simWordVec(qnadoc, otherdoc, question, otherquestion):
-    qnlp = nlp(qnadoc.name +" "+ question.question)
-    oqnlp = nlp(otherdoc.name +" "+ otherquestion.question)
-                    
-    similarity = qnlp.similarity(oqnlp)
-    if similarity > 0.95:
-        print(qnadoc.name, ":", qnlp.text)
-        print(otherdoc.name, ":", oqnlp.text)
-        print(similarity)
-
-def simKeywordsAnswer(qnadoc, otherdoc, question, otherquestion):
-    keywords = question.metadata["keywords"].split(',')
-    otherKeywords = otherquestion.metadata["keywords"].split(',')
-    results = set(keywords).intersection(otherKeywords)
-    if len(results) > 1:
-        print(qnadoc.name, ":", question.question)
-        print(otherdoc.name, ":", otherquestion.question)
-        print("Shared Keywords:",len(results),list(results))
-
-def simKeywordsDoc(qnadoc, otherdoc):
-    keywords = qnadoc.metadata["keywords"].split(',')
-    otherKeywords = otherdoc.metadata["keywords"].split(',')
-
-    results = set(keywords).intersection(otherKeywords)
-    count = len(results)
-    if count > 2:
-        print(qnadoc.name, keywords)
-        print(otherdoc.name, otherKeywords)
-        print("Shared Keywords:",len(results),list(results))
-        qnadoc.addRelatedDoc(otherdoc, count, ','.join(results))
-        otherdoc.addRelatedDoc(qnadoc, count, ','.join(results))
-
-
 def findSimilarQuestions(doclist, simans=None, simdoc=None):
     completed = set()
     for qnadoc in doclist:
@@ -266,12 +152,14 @@ rows = list(reader)
 
 # extractQuestions(rows[0])
 
+filenames = [getFileName(row) for row in rows]
+
 p = Pool(4)
 try:
     p.map(getItem, rows)
-    p.map(extractText, rows)
+    p.map(pdf.extract_text, filenames)
     docs = p.map(extractQuestions, rows)
-    findSimilarQuestions(docs, simdoc=simKeywordsDoc)    
+    findSimilarQuestions(docs, simdoc=compare.compare_doc_keywords)    
     for doc in docs:
         if doc is None:
             continue
