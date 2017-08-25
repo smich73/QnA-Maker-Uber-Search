@@ -23,6 +23,7 @@ bld/
 [Bb]in/
 [Oo]bj/
 [Ll]og/
+.env
 
 # Visual Studio 2015 cache/options directory
 .vs/
@@ -286,5 +287,10 @@ __pycache__/
 *.btm.cs
 *.odx.cs
 *.xsd.cs
+<<<<<<< HEAD
 
 python/.spacy/*
+=======
+/python/.spacy
+/.vscode/tags
+>>>>>>> 28f9007a9b9edc92646b7408414420a698da9f5f
