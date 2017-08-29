@@ -1,12 +1,10 @@
 """Extract keywords from text"""
 
-import urllib.request
 import re
 from collections import Counter
 import spacy
 
-def is_word(nlp, word):
-    """Return true if specified string is a word (i.e. not an empty string, punctuation etc.)"""
+def _is_word(nlp, word):
     return not nlp.vocab[word.lemma_].is_stop and word.lemma_ != ''\
         and not word.lemma_.isspace() and word.lemma_ != '-PRON-' and word.lemma_ != "'"
 
@@ -20,7 +18,7 @@ def extract_keywords(nlp, text, number_to_return):
     words = []
 
     for word in processed_text:
-        if is_word(nlp, word):
+        if _is_word(nlp, word):
             words.append(word.lemma_)
 
     sorted_words = Counter(words)
