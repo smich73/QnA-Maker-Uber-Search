@@ -56,14 +56,14 @@ def _get_question_subject(question, doc_name):
 def _enrich_qna(qnadoc):
     allwords = ""
 
-    for question in qnadoc.questions:
-        question.add_metadata("keywords", keywords.extract_keywords(NLP, question.answer, 5))
+    for qna_pair in qnadoc.qnaList:
+        qna_pair.add_metadata("keywords", keywords.extract_keywords(NLP, qna_pair.answer, 5))
 
-        subject = _get_question_subject(question.question, qnadoc.name.lower())
-        question.add_metadata("subject", subject)
+        subject = _get_question_subject(qna_pair.questions[0], qnadoc.name.lower())
+        qna_pair.add_metadata("subject", subject)
 
-        allwords += question.question
-        allwords += question.answer
+        allwords += qna_pair.questions[0]
+        allwords += qna_pair.answer
 
     qnadoc.add_metadata("keywords", keywords.extract_keywords(NLP, allwords, 10))
 
@@ -80,13 +80,13 @@ def _extract_questions(row):
             nlp_doc = NLP(txt.decode("utf8"))
             qnadoc = QnaDoc(row[0], row[1], row[2], filename)
             qnadoc.add_metadata("Created", time.strftime("%H:%M:%S %m/%d/%Y"))
-            pair = QnaPair("Intro")
+            pair = QnaPair("Intro", qnadoc.source)
 
             for sent in nlp_doc.sents:
                 if "?" in sent.text:
                     pair.add_metadata("EndPosition", str(sent.end))
                     qnadoc.add_pair(pair)
-                    pair = QnaPair(sent.text)
+                    pair = QnaPair(sent.text, qnadoc.source)
                     pair.add_metadata("StartPosition", str(sent.start))
                 else:
                     pair.add_answer_text(sent.text)
@@ -117,8 +117,8 @@ def _find_similar_questions(doclist, simans=None, simdoc=None):
             if simans is None:
                 continue
             else:
-                for question in qnadoc.questions:
-                    for otherquestion in otherdoc.questions:
+                for question in qnadoc.qnaList:
+                    for otherquestion in otherdoc.qnaList:
                         simans(qnadoc, otherdoc, question, otherquestion)
 
 def preprocess_docs():
