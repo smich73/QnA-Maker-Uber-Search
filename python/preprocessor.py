@@ -18,7 +18,7 @@ import keywords
 
 from models import QnaDoc, QnaPair
 
-DATA_DIR = = os.environ["PDATA_DIR"]
+DATA_DIR = os.environ["PDATA_DIR"]
 STOPWORD_URL = "https://qnageneratorstorage.blob.core.windows.net/stopwords/customStopwords.txt"
 NLP = spacy.load('en')
 
