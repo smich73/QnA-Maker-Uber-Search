@@ -47,11 +47,10 @@ def _get_question_subject(question, doc_name):
     question_subject = keywords.extract_keywords(NLP, question, 1)
 
     if _matches_main_doc_subject(question_subject, doc_name):
-        return doc_name
+        question_subject = doc_name
     elif "complication" in question_subject or "complication" in question:
-        return "complications of " + doc_name
-    else:
-        return question_subject
+        question_subject = "complications of " + doc_name
+    return question_subject
 
 def _enrich_qna(qnadoc):
     allwords = ""
