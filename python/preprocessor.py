@@ -1,6 +1,8 @@
 #!/usr/bin/python
 
-"""Preprocesses PDF document(s) and enriches with further information to aid in search"""
+"""Preprocesses PDF document(s) and enriches with further information
+    (e.g. keywords, similar documents...) to aid in search"""
+
 import sys
 import csv
 import os
