@@ -29,8 +29,6 @@ function startTimer() {
         var preprocessedDoc = qnaCollection.shift();
 
         var qna = require(preprocessedDoc);
-        var qnaSource = qna.source;
-        qna = prepQnAForUpload(qna);
         console.log("Processing:", qna.name);
 
         createQnA(qna, function(response) {
@@ -50,17 +48,6 @@ function startTimer() {
             }
         });
     }, 8000);
-}
-
-function prepQnAForUpload(qna){
-    // Prepare QnA Maker-friendly JSON for upload
-    delete qna.filename;
-    delete qna.id;
-    delete qna.source;
-    delete qna.related;
-    delete qna.metadata;
-
-    return qna;
 }
 
 function createQnA(qnaForUpload, callback) {
@@ -103,7 +90,7 @@ function createTableEntry(qna, kbID) {
         PartitionKey: {'_': 'Conditions'},
         RowKey: {'_': qna.name},
         KBID: {'_': kbID},
-        DocURL: {'_': qna.qnaList[0].source}
+        DocURL: {'_': qna.source}
     };
 
     tableSvc.insertEntity('qnaIndex', qnaEntry, function (error, result, response) {
