@@ -14,6 +14,7 @@ class QnaDoc:
         self.qnaList = list() # Non-standard attribute name required by QnA Maker API
         self.metadata = {}
         self.related = list()
+        self.urls = list()
 
     def add_pair(self, pair):
         """Add QnA pair to parent document"""
