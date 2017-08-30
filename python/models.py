@@ -2,6 +2,8 @@
 
 import json
 
+
+
 class QnaDoc:
     """Parent model for all QnA documents, including QnA pairs, source information,
         metadata and related documents"""
@@ -14,11 +16,13 @@ class QnaDoc:
         self.qnaList = list() # Non-standard attribute name required by QnA Maker API
         self.metadata = {}
         self.related = list()
+        self.allquestions = list()
 
     def add_pair(self, pair):
         """Add QnA pair to parent document"""
-
-        self.qnaList.append(pair)
+        self.qnaList.append(pair)      
+        for question in pair.questions:
+            self.allquestions.append(question)
 
     def save_json(self):
         """Save QnA document as JSON file"""

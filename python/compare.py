@@ -2,6 +2,7 @@
 
 #import spacy
 
+#TODO Try retraining on the corpus of text we have. 
 '''
 def compare_word_vec(qnadoc, otherdoc, question, otherquestion):
     """Compare word vectors"""
