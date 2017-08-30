@@ -2,6 +2,12 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "type": "node",
+            "request": "launch",
+            "name": "Search Setip",
+            "program": "${workspaceRoot}/azuresearch/searchupdater.js"
+        },
+        {
             "name": "Python",
             "type": "python",
             "request": "launch",
