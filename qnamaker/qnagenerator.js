@@ -31,23 +31,72 @@ function startTimer() {
         var qna = require(preprocessedDoc);
         console.log("Processing:", qna.name);
 
-        createQnA(qna, function(response) {
-            if (!response.includes('Error')) {
-                createTableEntry(qna, response);
-                console.log("Success:", qna.name, "QnAs left:", qnaCollection.length);
+        //UNTESTED
+        var qnaExists = checkIfExists(qna);
 
-                if (qnaCollection.length === 0) {
-                    clearInterval(timer);
-                    timerActive = false;
-                    console.log("No more QnAs found. Pausing timer.");
+        if (qnaExists) {
+            getQnA(kbID, function(response) {
+                if (!response.includes('Error')) {
+                    var updates = getDiff(respone, qna);
+                    updateQnA(updates);
                 }
-            }
-            else {
-                qnaCollection.push(preprocessedDoc);
-                console.log(response,"QnAs left:", qnaCollection.length);
-            }
-        });
+                else {
+                    qnaCollection.push(preprocessedDoc);
+                    console.log(response,"QnAs left:", qnaCollection.length);
+                }
+            });
+        }
+        else {
+            createQnA(qna, function(response) {
+                if (!response.includes('Error')) {
+                    createTableEntry(qna, response);
+                    console.log("Success:", qna.name, "QnAs left:", qnaCollection.length);
+
+                    if (qnaCollection.length === 0) {
+                        clearInterval(timer);
+                        timerActive = false;
+                        console.log("No more QnAs found. Pausing timer.");
+                    }
+                }
+                else {
+                    qnaCollection.push(preprocessedDoc);
+                    console.log(response,"QnAs left:", qnaCollection.length);
+                }
+            });
+        }
     }, 8000);
+}
+
+function checkIfExists(qna) {
+    //UNTESTED
+    var azure = require('azure-storage');
+
+    var exists = false;
+
+    var query = new azure.TableQuery()
+    .top(1)
+    .where('PartitionKey eq ?', 'Conditions').and('RowKey eq ?', qna.name);
+
+    var retryOperations = new azure.ExponentialRetryPolicyFilter();
+    var tableSvc = azure.createTableService(tableConnStr).withFilter(retryOperations);
+
+    tableSvc.queryEntities('qnaIndex', query, null, function(error, result, response) {
+        if(!error) {
+          if (result.entries.length > 0) {
+              exists = true;
+          }
+        }
+    });
+
+    return exists;
+}
+
+function getDiff(existingQnA, newQnA) {
+    //UNTESTED
+    // Compare QnAs and create update JSON for POST to QnA Maker API
+    var diff = require('deep-diff').diff;
+
+    var differences = diff(existingQnA, newQnA);
 }
 
 function createQnA(qnaForUpload, callback) {
@@ -62,7 +111,7 @@ function createQnA(qnaForUpload, callback) {
 
     // Configure the request
     var options = {
-        url: qnaURL,
+        url: qnaURL + 'create',
         method: 'POST',
         headers: headers,
         json: qnaForUpload
@@ -77,6 +126,38 @@ function createQnA(qnaForUpload, callback) {
             callback("Error: " + JSON.parse(body).message + " Status code: " + response.statusCode);
         }
     });
+}
+
+function getQnA(kbID, callback) {
+    //UNTESTED
+    var request = require('request');
+
+    // Set the headers
+    var headers = {
+        'Ocp-Apim-Subscription-Key': subKey,
+        'Content-Type': 'application/json'
+    };
+
+    // Configure the request
+    var options = {
+        url: qnaURL + kbID,
+        method: 'GET',
+        headers: headers
+    };
+
+    // Start the request
+    request(options, function (error, response, body) {
+
+        if (!error && response.statusCode === 200) {
+            callback(JSON.parse(body));
+        } else {
+            callback("Error: " + JSON.parse(body).message + " Status code: " + response.statusCode);
+        }
+    });
+}
+
+function updateQnA(qna, existingKBID) {
+    //TODO: IMPLEMENT
 }
 
 function createTableEntry(qna, kbID) {
