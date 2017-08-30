@@ -1,253 +1,85 @@
-var stopwords;
+var chokidar = require('chokidar');
+var fs = require('fs');
+var qnaCollection = [];
+var timer;
+timerActive = false;
 
-getTextFromURL(stopwordURL, function(result){
+var watcher = chokidar.watch(filepath);
+watcher
+    .on('add', path => process(path))
+    .on('change', path => process(path));
 
-    stopwords = result.replace(/["]+/g, '').replace(/[\n]+/g, '').split('\r');
-});
+function process(path) {
+    var fileParts = path.split('.');
 
-module.exports = function (context, medicalDoc) {
+    if (fileParts.slice(-1)[0] === 'json') {
+        console.log("New QnA found.", path);
 
-    var retryCount = 0;
-    var fileName = context.bindingData.name;
-    var conditionName = fileName.split(".")[0];
-
-    var docURL = process.env['StorageURL'] + fileName;
-
-    getTextFromURL(docURL, function(result){
-
-        var qna = splitTSV(result);
-
-        var questions = qna.questions;
-        var answers = qna.answers;
-
-        var keywords = getKeywords(answers, process.env['NumberOfKeywords']);
-        var qnaCollection = createQnACollection(questions, answers, conditionName, docurl);
-
-        //TODO: Check if KB already exists first
-        createAndRegisterQnA(conditionName, qnaCollection, keywords);
-    });
-};
-
-function getTextFromURL(url, callback) {
-
-    var request = require('request');
-
-    request.get(url,function (error, response, body) {
-
-        if (!error && response.statusCode === 200) {
-
-            callback(body);
-        }
-    });
-}
-
-function splitTSV(tsv) {
-
-    var linesOfText = tsv.split('\n');
-
-    var questions = [];
-    var answers = [];
-
-    for (var i = 0; i < linesOfText.length; i++){
-
-        var line = linesOfText[i].split('\t');
-
-            questions.push(line[0]);
-            answers.push(line[1]);
-            //conditions.push(line[2]);
-            //sources.push(line[3]);
-    }
-
-    var QnA = {
-        "questions": questions,
-        "answers": answers
-    };
-
-    return QnA;
-}
-
-function getKeywords(text, numberOfKeywords) {
-
-    var words = getWords(text);
-
-    var countedWords = countWords(words);
-
-    var keywords = getTopWords(countedWords, numberOfKeywords);
-
-    return keywords;
-}
-
-// Assumes input is array of questions or answers or whatever
-function getWords(text) {
-
-    var words = [];
-
-    for (var i = 0; i < text.length - 1; i++){
-
-        var allWords = text[i].replace(/[0-9]/g, '').split(' ');
-
-        for (var j = 0; j < allWords.length; j++){
-
-            var word = allWords[j].toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_~()]/g,"").replace(/\s{2,}/g,"");
-
-            if (stopwords.indexOf(word) === -1 && word !== ''){
-
-                words.push(word);
-            }
+        qnaCollection.push(path);
+        if(!timerActive){
+            console.log("Starting timer.");
+            startTimer();
         }
     }
-
-    return words;
 }
 
-function countWords(words) {
-    var wordCount = {};
+// Try to upload QnA once every 8 seconds. If this fails, add QnA back to queue for processing later.
+function startTimer() {
+    timer = setInterval(function () {
+        timerActive = true;
 
-    for (var i = 0; i < words.length; i++)
-    {
+        var preprocessedDoc = qnaCollection.shift();
 
-        var word = words[i];
+        var qna = fs.readFileSync (preprocessedDoc);
+        var qnaForUpload = prepQnAForUpload(qna);
+        console.log("Processing:", qnaForUpload.name);
 
-        if(wordCount[word] == null){
-
-            wordCount[word] = 1;
-        } else {
-
-            wordCount[word]++;
-        }
-    }
-
-    return wordCount;
-}
-
-function getTopWords(countedWords, numberOfWords) {
-    var sortedWords = [];
-
-    for (var word in countedWords) {
-
-        sortedWords.push([word, countedWords[word]]);
-    }
-
-    context.log('Found ' + sortedWords.length + ' unique words not in the stopword list.');
-
-    sortedWords.sort(function(a, b) {
-
-        return b[1] - a[1];
-    });
-
-    var topWords = [];
-
-    for (var i = 0; i < numberOfWords; i++){
-
-        topWords.push(sortedWords[i][0]);
-    }
-
-    context.log("Top " + numberOfWords + " words:\n" + topWords);
-
-    return topWords;
-}
-
-function createQnACollection(questions, answers, conditionName, source) {
-
-    var qnaCollection = [];
-
-    for (var i = 0; i < questions.length; i++) {
-
-        getIntent(asasdad, questions[i], function (result){
-
-            //TODO: Check for errors first
-            var qna = {
-                "answer": answers[i],
-                "questions": [
-                    questions[i]
-                ],
-                "source": source,
-                "metadata": [
-                    {
-                        "name": "intent",
-                        "value": result
-                    },
-                    {
-                        "name": "parentCondition",
-                        "value": conditionName
-                    },
-                    {
-                        "name": "subject",
-                        "value": subject
-                    }
-                ]
-            };
-
-            qnaCollection.push(qna);
-        });
-    }
-
-    return qnaCollection;
-}
-
-function getIntent(query, callback) {
-
-    var request = require('request');
-
-    var url = process.env['LUISURL'] + '&q=' + query;
-
-    request.get(url, function (error, response, body) {
-
-        if (!error && response.statusCode === 200) {
-            callback(JSON.parse(body).topScoringIntent.intent);
-        }
-    });
-}
-
-
-
-
-
-
-
-
-function createAndRegisterQnA(qnaName, qnaPairs, keywords) {
-
-        createQnA(qnaName, qnaPairs, function(response) {
-
+        createQnA(qnaForUpload, function(response) {
             if (!response.includes('Error')) {
+                createTableEntry(qna, response);
+                console.log("Success:", qnaForUpload.name);
 
-                createTableEntry(qnaName, response, keywords, docURL); //TODO: Download TSV once KB is created and push to Blob (add output) - docURL is then stored in the Table for future edits
+                if (qnaCollection.length === 0) {
+                    clearInterval(timer);
+                    timerActive = false;
+                    console.log("No more QnAs found. Pausing timer.");
+                }
             }
             else {
-
-                context.log(response);
-
-                setTimeout(function () {
-
-                    context.log("Trying again:", qnaName);
-                    createAndRegisterQnA(qnaName, qnaPairs, keywords);
-
-                }, 8000);
+                console.log(response);
+                qnaCollection.push(preprocessedDoc);
             }
         });
+    }, 8000);
 }
 
-function createQnA(qnaName, qnaPairs, callback) {
+function prepQnAForUpload(preprocessedDoc){
+    // Prepare QnA Maker-friendly JSON for upload
+    delete preprocessedDoc.filename;
+    delete preprocessedDoc.id;
+    delete preprocessedDoc.source;
+    delete preprocessedDoc.related;
+    delete preprocessedDoc.metadata;
+
+    return preprocessedDoc;
+}
+
+function createQnA(qnaForUpload, callback) {
 
     var request = require('request');
 
     // Set the headers
     var headers = {
-        'Ocp-Apim-Subscription-Key': process.env['QnASubKey'],
+        'Ocp-Apim-Subscription-Key': subKey,
         'Content-Type': 'application/json'
     };
 
     // Configure the request
     var options = {
-        url: process.env['QnAURL'],
+        url: qnaURL,
         method: 'POST',
         headers: headers,
-        form: {
-            "name": qnaName,
-            "qnaPairs": qnaPairs,
-            "urls": []
-        }
+        form: qnaForUpload
     };
 
     // Start the request
@@ -261,25 +93,24 @@ function createQnA(qnaName, qnaPairs, callback) {
     });
 }
 
-function createTableEntry(qnaName, kbID, keywords, docURL) {
+function createTableEntry(qna, kbID) {
 
     var azure = require('azure-storage');
 
     var retryOperations = new azure.ExponentialRetryPolicyFilter();
-    var tableSvc = azure.createTableService(process.env['TableStorageConnString']).withFilter(retryOperations);
+    var tableSvc = azure.createTableService(tableConnStr).withFilter(retryOperations);
 
     var qnaEntry = {
-        PartitionKey: {'_': process.env['TablePartitionKey']},
-        RowKey: {'_': qnaName},
+        PartitionKey: {'_': 'Conditions'},
+        RowKey: {'_': qna.name},
         KBID: {'_': kbID},
-        Keywords: {'_': keywords},
-        DocURL: {'_': docURL}
+        DocURL: {'_': qna.source}
     };
 
-    tableSvc.insertEntity(process.env['TableName'], qnaEntry, function (error, result, response) {
+    tableSvc.insertEntity('qnaIndex', qnaEntry, function (error, result, response) {
         if (!error) {
             count++;
-            context.log("Success:", qnaName);
+            context.log("Success:", qna.name);
 
         } else {
 
