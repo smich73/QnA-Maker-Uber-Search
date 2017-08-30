@@ -1,5 +1,4 @@
 var chokidar = require('chokidar');
-var fs = require('fs');
 var qnaCollection = [];
 var timer;
 timerActive = false;
@@ -17,27 +16,27 @@ function process(path) {
 
         qnaCollection.push(path);
         if(!timerActive){
+            timerActive = true;
             console.log("Starting timer.");
             startTimer();
         }
     }
 }
 
-// Try to upload QnA once every 8 seconds. If this fails, add QnA back to queue for processing later.
+// Try to upload QnA once every 8 seconds. If this fails, add QnA back to end of queue for processing later.
 function startTimer() {
     timer = setInterval(function () {
-        timerActive = true;
-
         var preprocessedDoc = qnaCollection.shift();
 
-        var qna = fs.readFileSync (preprocessedDoc);
-        var qnaForUpload = prepQnAForUpload(qna);
-        console.log("Processing:", qnaForUpload.name);
+        var qna = require(preprocessedDoc);
+        var qnaSource = qna.source;
+        qna = prepQnAForUpload(qna);
+        console.log("Processing:", qna.name);
 
-        createQnA(qnaForUpload, function(response) {
+        createQnA(qna, function(response) {
             if (!response.includes('Error')) {
                 createTableEntry(qna, response);
-                console.log("Success:", qnaForUpload.name);
+                console.log("Success:", qna.name, "QnAs left:", qnaCollection.length);
 
                 if (qnaCollection.length === 0) {
                     clearInterval(timer);
@@ -46,22 +45,22 @@ function startTimer() {
                 }
             }
             else {
-                console.log(response);
                 qnaCollection.push(preprocessedDoc);
+                console.log(response,"QnAs left:", qnaCollection.length);
             }
         });
     }, 8000);
 }
 
-function prepQnAForUpload(preprocessedDoc){
+function prepQnAForUpload(qna){
     // Prepare QnA Maker-friendly JSON for upload
-    delete preprocessedDoc.filename;
-    delete preprocessedDoc.id;
-    delete preprocessedDoc.source;
-    delete preprocessedDoc.related;
-    delete preprocessedDoc.metadata;
+    delete qna.filename;
+    delete qna.id;
+    delete qna.source;
+    delete qna.related;
+    delete qna.metadata;
 
-    return preprocessedDoc;
+    return qna;
 }
 
 function createQnA(qnaForUpload, callback) {
@@ -79,14 +78,14 @@ function createQnA(qnaForUpload, callback) {
         url: qnaURL,
         method: 'POST',
         headers: headers,
-        form: qnaForUpload
+        json: qnaForUpload
     };
 
     // Start the request
     request(options, function (error, response, body) {
 
         if (!error && response.statusCode === 201) {
-            callback(JSON.parse(body).kbId);
+            callback(body.kbId);
         } else {
             callback("Error: " + JSON.parse(body).message + " Status code: " + response.statusCode);
         }
@@ -104,17 +103,12 @@ function createTableEntry(qna, kbID) {
         PartitionKey: {'_': 'Conditions'},
         RowKey: {'_': qna.name},
         KBID: {'_': kbID},
-        DocURL: {'_': qna.source}
+        DocURL: {'_': qna.qnaList[0].source}
     };
 
     tableSvc.insertEntity('qnaIndex', qnaEntry, function (error, result, response) {
-        if (!error) {
-            count++;
-            context.log("Success:", qna.name);
-
-        } else {
-
-            context.log("Error inserting to Azure Table:", error.message);
+        if (error) {
+            console.log("Error inserting to Azure Table:", error.message);
         }
     });
 }
