@@ -26,7 +26,6 @@ DATA_DIR = os.environ["PDATA_DIR"]
 STOPWORD_URL = "https://qnageneratorstorage.blob.core.windows.net/stopwords/customStopwords.txt"
 NLP = spacy.load('en')
 
-
 def _get_filename(row):
     leaflet_title = re.sub(r'[^\w]', ' ', row[1])
     name = "{0}_{1}.pdf".format(row[0], leaflet_title)
@@ -103,10 +102,14 @@ def _extract_questions(row):
 
     def finish_existing_question(sent):
         pair.add_metadata("EndPosition", str(sent.end))
-        qnadoc.add_pair(pair)
+        if pair.answer != "":
+            qnadoc.add_pair(pair)
+        else:
+            print("Error, no answer text found for the question. Question was:", pair.questions[0], "Source:", pair.source)
 
     def add_answer_text(sent):
-        pair.add_answer_text(sent.text)
+        if sent.text != "":
+            pair.add_answer_text(sent.text)
 
     try:
         filename = _get_filename(row)

@@ -3,6 +3,11 @@ var qnaCollection = [];
 var timer;
 timerActive = false;
 
+var filepath = os.environ["PDATA_DIR"];
+var subKey = '';
+var qnaURL = '';
+var tableConnStr = '';
+
 var watcher = chokidar.watch(filepath);
 watcher
     .on('add', path => process(path))
@@ -25,78 +30,168 @@ function process(path) {
 
 // Try to upload QnA once every 8 seconds. If this fails, add QnA back to end of queue for processing later.
 function startTimer() {
-    timer = setInterval(function () {
+    timer = setInterval(function() {
         var preprocessedDoc = qnaCollection.shift();
 
         var qna = require(preprocessedDoc);
         console.log("Processing:", qna.name);
 
-        //UNTESTED
-        var qnaExists = checkIfExists(qna);
+        checkIfExists(qna, function(kbID){
+            if (kbID !== '') {
+                getQnA(kbID, function(response) {
+                    if (response !== 'Error') {
+                        var updates = getDiff(JSON.parse(response), qna);
+                        updateQnA(updates, kbID, function(response){
+                            if (response !== 'Error') {
+                                console.log("Updated QnA:", qna.name, "QnAs left:", qnaCollection.length);
 
-        if (qnaExists) {
-            getQnA(kbID, function(response) {
-                if (!response.includes('Error')) {
-                    var updates = getDiff(respone, qna);
-                    updateQnA(updates);
-                }
-                else {
-                    qnaCollection.push(preprocessedDoc);
-                    console.log(response,"QnAs left:", qnaCollection.length);
-                }
-            });
-        }
-        else {
-            createQnA(qna, function(response) {
-                if (!response.includes('Error')) {
-                    createTableEntry(qna, response);
-                    console.log("Success:", qna.name, "QnAs left:", qnaCollection.length);
-
-                    if (qnaCollection.length === 0) {
-                        clearInterval(timer);
-                        timerActive = false;
-                        console.log("No more QnAs found. Pausing timer.");
+                                if (qnaCollection.length === 0) {
+                                    clearInterval(timer);
+                                    timerActive = false;
+                                    console.log("No more QnAs found. Pausing timer.");
+                                }
+                            }
+                            else {
+                                qnaCollection.push(preprocessedDoc);
+                                console.log(response,"QnAs left:", qnaCollection.length);
+                            }
+                        });
                     }
-                }
-                else {
-                    qnaCollection.push(preprocessedDoc);
-                    console.log(response,"QnAs left:", qnaCollection.length);
-                }
-            });
-        }
+                    else {
+                        qnaCollection.push(preprocessedDoc);
+                        console.log(response,"QnAs left:", qnaCollection.length);
+                    }
+                });
+            }
+            else {
+                createQnA(qna, function(response) {
+                    if (response !== 'Error') {
+                        createTableEntry(qna, response);
+                        console.log("Success:", qna.name, "QnAs left:", qnaCollection.length);
+
+                        if (qnaCollection.length === 0) {
+                            clearInterval(timer);
+                            timerActive = false;
+                            console.log("No more QnAs found. Pausing timer.");
+                        }
+                    }
+                    else {
+                        qnaCollection.push(preprocessedDoc);
+                        console.log(response,"QnAs left:", qnaCollection.length);
+                    }
+                });
+            }
+        });
     }, 8000);
 }
 
-function checkIfExists(qna) {
-    //UNTESTED
+function checkIfExists(qna, callback) {
     var azure = require('azure-storage');
 
-    var exists = false;
+    var kbID = '';
 
     var query = new azure.TableQuery()
     .top(1)
-    .where('PartitionKey eq ?', 'Conditions').and('RowKey eq ?', qna.name);
+    .where('PartitionKey eq ?', 'Conditions').and('RowKey eq ?', qna.id);
 
     var retryOperations = new azure.ExponentialRetryPolicyFilter();
     var tableSvc = azure.createTableService(tableConnStr).withFilter(retryOperations);
 
-    tableSvc.queryEntities('qnaIndex', query, null, function(error, result, response) {
+    tableSvc.queryEntities('newQnAIndex', query, null, function(error, result, response) {
         if(!error) {
           if (result.entries.length > 0) {
-              exists = true;
+              kbID = result.entries[0].KBID._;
           }
         }
+        else {
+            console.log("Error:", error.message);
+        }
+        callback(kbID);
     });
-
-    return exists;
 }
 
 function getDiff(existingQnA, newQnA) {
-    //UNTESTED
+
     // Compare QnAs and create update JSON for POST to QnA Maker API
     var diff = require('deep-diff').diff;
 
+    // Add 'Editorial' QnA created by the QnA Maker service to ensure parity
+    if (newQnA.qnaList[0].source !== "Editorial") {
+        newQnA.qnaList.unshift({
+            "qnaId": 1,
+            "answer": "Hello",
+            "source": "Editorial",
+            "questions": ["Hi"],
+            "metadata": []
+        });
+    }
+
     var differences = diff(existingQnA, newQnA);
+
+    // Schema from https://westus.dev.cognitive.microsoft.com/docs/services/597029932bcd590e74b648fb/operations/5970428523618c05e45ab128
+    var patch = {
+        "add": {
+            "qnaList": [],
+            "urls": [],
+            "users": []
+        },
+        "delete": {
+            "qnaIds": [],
+            "sources": [],
+            "users": []
+        },
+        "update": {
+            "name": newQnA.name,
+            "qnaList": [],
+            "urls": []
+        }
+    };
+
+    var blankPatch = JSON.stringify(patch);
+
+    for (var i = 0; i < differences.length; i++) {
+        var change = differences[i];
+        // Add new question
+        if (change.kind === "A" && change.item.kind === "N" && change.path[0] === "qnaList" && change.path.length === 1) {
+            patch.add.qnaList.push(change.item.rhs);
+        }
+        // Delete question
+        if (change.kind === "A" && change.item.kind === "D" && change.path[0] === "qnaList" && change.path.length === 1) {
+            patch.delete.qnaIds.push(change.item.lhs.qnaId);
+        }
+        // Modify existing questions in a QnA set
+        if (change.kind === "A" && change.item.kind === "E" && change.path[0] === "qnaList" && change.path[2] === "questions") {
+            patch.update.qnaList.push({
+                "qnaId": newQnA.qnaId,
+                "answer": newQnA.answer,
+                "source": newQnA.source,
+                "questions": {
+                    "add": change.item.rhs,
+                    "delete": change.item.lhs
+                },
+                "metadata": {}
+            });
+        }
+        // Modify existing metadata in a QnA set
+        if (change.kind === "A" && change.item.kind === "E" && change.path[0] === "qnaList" && change.path[2] === "metadata") {
+            patch.update.qnaList.push({
+                "qnaId": newQnA.qnaId,
+                "answer": newQnA.answer,
+                "source": newQnA.source,
+                "questions": {},
+                "metadata": {
+                    "add": change.item.rhs,
+                    "delete": change.item.lhs
+                }
+            });
+        }
+    }
+    if (JSON.stringify(patch) === blankPatch) {
+        return "No change";
+    }
+    else {
+        return patch;
+    }
 }
 
 function createQnA(qnaForUpload, callback) {
@@ -123,13 +218,13 @@ function createQnA(qnaForUpload, callback) {
         if (!error && response.statusCode === 201) {
             callback(body.kbId);
         } else {
-            callback("Error: " + JSON.parse(body).message + " Status code: " + response.statusCode);
+            console.log("Error:", body, "Status code:", response.statusCode);
+            callback("Error");
         }
     });
 }
 
 function getQnA(kbID, callback) {
-    //UNTESTED
     var request = require('request');
 
     // Set the headers
@@ -149,15 +244,45 @@ function getQnA(kbID, callback) {
     request(options, function (error, response, body) {
 
         if (!error && response.statusCode === 200) {
-            callback(JSON.parse(body));
+            callback(body);
         } else {
-            callback("Error: " + JSON.parse(body).message + " Status code: " + response.statusCode);
+            console.log("Error:", body, "Status code:", response.statusCode);
+            callback("Error");
         }
     });
 }
 
-function updateQnA(qna, existingKBID) {
-    //TODO: IMPLEMENT
+function updateQnA(patch, kbID, callback) {
+    if (patch === 'No change') {
+        console.log("No change detected. QnAs left:", qnaCollection.length);
+        return;
+    }
+    var request = require('request');
+
+    // Set the headers
+    var headers = {
+        'Ocp-Apim-Subscription-Key': subKey,
+        'Content-Type': 'application/json'
+    };
+
+    // Configure the request
+    var options = {
+        url: qnaURL + kbID,
+        method: 'PATCH',
+        headers: headers,
+        json: patch
+    };
+
+    // Start the request
+    request(options, function (error, response, body) {
+
+        if (!error && response.statusCode === 204) {
+            callback(body);
+        } else {
+            console.log("Error:", body, "Status code:", response.statusCode);
+            callback("Error");
+        }
+    });
 }
 
 function createTableEntry(qna, kbID) {
@@ -169,12 +294,13 @@ function createTableEntry(qna, kbID) {
 
     var qnaEntry = {
         PartitionKey: {'_': 'Conditions'},
-        RowKey: {'_': qna.name},
+        RowKey: {'_': qna.id},
+        Condition: {'_': qna.name},
         KBID: {'_': kbID},
         DocURL: {'_': qna.source}
     };
 
-    tableSvc.insertEntity('qnaIndex', qnaEntry, function (error, result, response) {
+    tableSvc.insertEntity('newQnAIndex', qnaEntry, function (error, result, response) {
         if (error) {
             console.log("Error inserting to Azure Table:", error.message);
         }

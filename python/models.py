@@ -73,7 +73,9 @@ class QnaPair:
 
     def add_metadata(self, key, value):
         """Add metadata to QnA"""
-        self.metadata.append(_QuestionMetaDataPair(key, value))
+        
+        if not (key == "" or value == "" or key.isspace() or value.isspace()):
+            self.metadata.append(_QuestionMetaDataPair(key, value))
 
 def encode_qna_pair(obj):
     """Encode QnA pair"""
