@@ -2,18 +2,19 @@ const search = require('azure-search-client')
 
 
 const config = {
-    searchName: '',
-    key: '',
-    blobConnectionString: '',
+    searchName: process.env.SEARH_NAME,
+    key: process.env.SEARCH_KEY,
+    blobConnectionString: process.env.BLOB_CONN_STRING,
     blobContainer: 'json2',
     datasourceName: 'jsonblobstore2',
     indexName: 'jsondataindex2',
     indexerName: 'jsondataindexer2'
 }
 
+const client = new search.SearchClient(config.searchName, config.key)
+
 
 function setupSearch() {
-    let client = new search.SearchClient(config.searchName, config.key)
     let datasource = {
         name:  config.datasourceName,
         type: "azureblob",
@@ -32,7 +33,7 @@ function setupSearch() {
                 { name: "source", type: "Edm.String", key: true},
                 { name: "name", type: "Edm.String" },
                 { name: "keywords", type: "Edm.String", sortable: false },
-                { name: "questions", type: "Collection(Edm.String)", sortable: false },
+                { name: "questions", type: "Edm.String", sortable: false },
 
             ]
         }
@@ -64,8 +65,8 @@ function createIndexer() {
         },
         fieldMappings: [
             { sourceFieldName: "/name", targetFieldName: "name" },
-            { sourceFieldName: "/metadata/keywords", targetFieldName:"keywords" },
-            { sourceFieldName: "/allquestions", targetFieldName: "questions", mappingFunction : { name : "jsonArrayToStringCollection" }}
+            { sourceFieldName: "/metadata/keywords", targetFieldName: "keywords" },
+            { sourceFieldName: "/allquestions", targetFieldName: "questions" }
         ]
     }
 
@@ -78,4 +79,5 @@ function createIndexer() {
     }) 
 }
 
-setupSearch()
+//setupSearch()
+createIndexer()

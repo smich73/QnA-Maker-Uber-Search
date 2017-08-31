@@ -5,7 +5,8 @@
             "type": "node",
             "request": "launch",
             "name": "Search Setip",
-            "program": "${workspaceRoot}/azuresearch/searchupdater.js"
+            "program": "${workspaceRoot}/azuresearch/searchupdater.js",
+            "envFile": "${workspaceRoot}/.env"
         },
         {
             "name": "Python",
