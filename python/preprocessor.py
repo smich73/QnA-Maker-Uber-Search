@@ -149,10 +149,10 @@ def _find_similar(doclist, simans=None, simdoc=None):
             simdoc(doc, otherdoc)
         
         if simans is not None:
-            for question in doc.qnaList:
-                for otherquestion in otherdoc.qnaList:
-                    simans(doc, otherdoc, question, otherquestion)
-                
+            for qtuple in itertools.product(doc.qnaList, otherdoc.qnaList):
+                question = qtuple[0]
+                otherquestion = qtuple[1]
+                simans(doc, otherdoc, question, otherquestion)
 
 
 def preprocess_docs():
@@ -173,7 +173,7 @@ def preprocess_docs():
     pool = Pool(multiprocessing.cpu_count())
 
     try:
-        # pool.map(_get_item, rows)
+        pool.map(_get_item, rows)
         pool.map(pdf.extract_text, filenames)
         docs = pool.map(_extract_questions, rows)
         docs = [d for d in docs if d is not None]
