@@ -34,6 +34,14 @@ const agClient = new ag.AggregateClient(searchClient, tableClient, config.qnaMak
 let isServerReady = false;
 // Setup Restify Server
 const server = restify.createServer();
+server.get('/healthz', (req, res) => {
+    if (isServerReady) {
+        res.send(200);
+    } else {
+        res.send(500);
+    }
+});
+
 server.listen(process.env.port || process.env.PORT || 3978, function () {
     console.log('%s listening to %s', server.name, server.url);
 
@@ -44,8 +52,6 @@ server.listen(process.env.port || process.env.PORT || 3978, function () {
             throw err;
         }
 
-        res.result.value
-
         tableClient.doesTableExist(config.lookupTableName, (err, res) => {
             if (err) {
                 console.error("Failed to connect to table storage");
@@ -55,30 +61,94 @@ server.listen(process.env.port || process.env.PORT || 3978, function () {
                 isServerReady = true;
                 setupServer();
             }
-        })
-    })
+        });
+    });
 });
 
 function setupServer() {
     server.post('/api/messages', chatConnector.listen());
     var bot = new builder.UniversalBot(chatConnector);
 
-    bot.dialog('/', (session, args) => {
+    bot.dialog('/',
+        [
+            (session, args) => {
+                builder.Prompts.text(session, "Welcome to QnA bot, you can ask questions and I'll lookup relivant information for you.");
+            },
+            (session, results, args) => {
+                session.replaceDialog('TopLevelQuestion', results.response);
+            }
+        ]);
 
-        session.send("Hello!");
-    });
+    bot.dialog('TopLevelQuestion',
+        [
+            (session, args) => {
+                agClient.searchAndScore(args).then(
+                    res => {
+                        if (res.length < 1) {
+                            session.replaceDialog('NotFound');
+                        }
+                        session.privateConversationData.questionContext = res[0].context;
+                        var msg = new builder.Message(session);
+                        msg.attachmentLayout(builder.AttachmentLayout.carousel)
+                        msg.attachments([
+                            new builder.HeroCard(session)
+                                .title(res[0].question)
+                                .text(res[0].answer)
+                        ]);
+                        builder.Prompts.text(session, msg);
+                    },
+                    err => {
+                        session.send("Sorry I had a problem finding an answer to that question");
+                        console.error(err);
+                    }
+                );
+            },
+            (session, result, args) => {
+                session.replaceDialog('FollowupQuestion', result.response);
+            }
+        ]
+    );
+
+    bot.dialog('NotFound', 
+    [
+        (session, args) => {
+            builder.Prompts.text("I'm sorry we couldn't find any answers to that one, could you reword the question and retry?");
+        },
+        (session, result, args) => {
+            session.replaceDialog('TopLevelQuestion', result.reponse);
+        }
+    ]);
+
+    bot.dialog('FollowupQuestion',
+        [
+            (session, args) => {
+                let context = session.privateConversationData.questionContext
+                context.scoreQuestion(args).then(
+                    res => {
+                        let topResult = res[0];
+                        if (topResult.score < 0.5) {
+                            session.replaceDialog('TopLevelQuestion', args.question);
+                        }
+                        session.privateConversationData.questionContext = res[0].context;
+                        var msg = new builder.Message(session);
+                        msg.attachmentLayout(builder.AttachmentLayout.carousel)
+                        msg.attachments([
+                            new builder.HeroCard(session)
+                                .title(res[0].question)
+                                .text(res[0].answer)
+                        ]);
+                        builder.Prompts.text(session, msg);
+                    },
+                    err => {
+                        session.send("Sorry I had a problem finding an answer to that question");
+                        console.error(err);
+                    }
+                )
+            },
+            (session, result, args) => {
+                session.replaceDialog('FollowupQuestion', result.reponse);
+            }
+        ]
+    );
 }
-
-let question = 'What is peripheral neuropathy?';
-agClient.findRelivantQnaDocs(question).then(
-    res => {
-        console.log(res);
-        agClient.scoreRelivantAnswers(res, question).then(res =>{
-            console.log(res);
-        })
-    },
-    err => {
-        console.error(err);
-    }
-);
 
