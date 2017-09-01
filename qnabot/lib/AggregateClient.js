@@ -31,7 +31,7 @@ class AggregateClient {
 
                     resolve(context);
                 } else {
-                    console.info('Item not found in lookup table for ' + item.name);
+                    console.error('Item not found in lookup table for ' + item.name);
                     resolve(null);
                 }
             });
@@ -58,8 +58,8 @@ class AggregateClient {
                 if (err) {
                     reject(err);
                 }
-                this._getQnaContexts(res.result.value).then(contexts=>{
-                    resolve(contexts.filter(x=> x.score > 0.5)); //TODO: pull out score cutoff into config 
+                this._getQnaContexts(res.result.value).then(contexts => {
+                    resolve(contexts.filter(x => x.score > 0.5)); //TODO: pull out score cutoff into config 
                 });
             });
         });
@@ -76,8 +76,25 @@ class AggregateClient {
                 res.forEach(answers => {
                     allAnwers.push(...answers);
                 })
+                allAnwers = allAnwers.sort((a, b) => b.score - a.score)
                 resolve(allAnwers);
             });
+        });
+    }
+
+    searchAndScore(question) {
+        return new Promise((resolve, reject) => {
+            this.findRelivantQnaDocs(question).then(
+                res => {
+                    this.scoreRelivantAnswers(res, question).then(res => {
+                        console.log(res);
+                        resolve(res);
+                    })
+                },
+                err => {
+                    reject(err);
+                }
+            );
         });
     }
 }

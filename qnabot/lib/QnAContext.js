@@ -38,9 +38,8 @@ class QnAContext {
                             result.answers.forEach(function (ans) {
                                 ans.score /= 100;
                                 ans.answer = htmlentities.decode(ans.answer);
-                                ans.question = ans.questions[0];
                                 var answerEntity = {
-                                    questionAsked: ans.question,
+                                    context: _this,
                                     questionMatched: ans.questions[0],
                                     score: ans.score,
                                     entity: ans.answer,
@@ -62,14 +61,18 @@ class QnAContext {
                 }
                 try {
                     if (!error) {
-                        resolve(answerEntities)
+                        if (result.score = 0){
+                            resolve([]);
+                        } else {
+                            resolve(answerEntities);
+                        }
                     }
                     else {
-                        reject(error)
+                        reject(error);
                     }
                 }
                 catch (e) {
-                    reject(e)
+                    reject(e);
                 }
             })
         })
