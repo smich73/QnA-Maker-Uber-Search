@@ -5,10 +5,12 @@ const qna = require('./QnAContext');
 const azureStorage = require('azure-storage')
 
 class AggregateClient {
-    constructor(searchClient, tableClient, qnaMakerKey) {
+    constructor(searchClient, tableClient, qnaMakerKey, searchConfidence = 0.7, qnaConfidence = 0.7) {
         this._searchClient = searchClient;
         this._qnaMakerKey = qnaMakerKey;
         this._tableClient = tableClient;
+        this._searchConfidence = searchConfidence;
+        this._qnaConfidence = qnaConfidence;
     }
 
     _lookupQna(item) {
@@ -27,7 +29,9 @@ class AggregateClient {
                         item.name,
                         item.source,
                         kbId,
-                        item["@search.score"]);
+                        item["@search.score"],
+                        JSON.parse(item.questions)
+                    );
 
                     resolve(context);
                 } else {
@@ -52,44 +56,72 @@ class AggregateClient {
         });
     }
 
-    findRelivantQnaDocs(question) {
+    _top(arr, t) {
+        if (t <= arr.length) {
+            return arr.slice(0, t - 1);
+        } else {
+            return arr;
+        }
+    }
+
+    findRelivantQnaDocs(question, top = 3) {
         return new Promise((resolve, reject) => {
-            this._searchClient.search(this._searchClient.indexName, { search: question }, (err, res) => {
+             this._searchClient.search(this._searchClient.indexName, { search: question, top: top }, (err, res) => {
                 if (err) {
                     reject(err);
                 }
                 this._getQnaContexts(res.result.value).then(contexts => {
-                    resolve(contexts.filter(x => x.score > 0.5)); //TODO: pull out score cutoff into config 
+                    resolve(contexts
+                            .filter(x => x.score > this._searchConfidence)
+                            .sort((a, b) => b.score - a.score)
+                    ); //TODO: pull out score cutoff into config 
                 });
             });
         });
     }
 
-    scoreRelivantAnswers(qnaDocList, question) {
+    scoreRelivantAnswers(qnaDocList, question, numToScore) {
         return new Promise((resolve) => {
-            var results = qnaDocList.map((doc) => {
+
+            var results = this._top(qnaDocList, numToScore).map((doc) => {
                 return doc.scoreQuestion(question)
             });
+
+            // Catch any errors that are returned from promises
+            // as promise.all will complete on first reject
+            var results = results.map(p => p.catch(e => {
+                console.error(`Failed scoring result: ${e}`);
+                return [];
+            }));
 
             Promise.all(results).then(res => {
                 let allAnwers = [];
                 res.forEach(answers => {
                     allAnwers.push(...answers);
-                })
-                allAnwers = allAnwers.sort((a, b) => b.score - a.score)
+                });
+                allAnwers = allAnwers
+                    .filter(a => a.score > this._qnaConfidence)
+                    .sort((a, b) => b.score - a.score);
+                
                 resolve(allAnwers);
             });
         });
     }
 
-    searchAndScore(question) {
+    searchAndScore(question, top = 3) {
         return new Promise((resolve, reject) => {
             this.findRelivantQnaDocs(question).then(
-                res => {
-                    this.scoreRelivantAnswers(res, question).then(res => {
-                        console.log(res);
-                        resolve(res);
-                    })
+                contexts => {
+                    this.scoreRelivantAnswers(contexts, question, top).then(
+                        answers => {
+                            resolve({
+                                contexts: this._top(contexts, top),
+                                answers: answers
+                            });
+                        },
+                        err => {
+                            reject(err);
+                        })
                 },
                 err => {
                     reject(err);

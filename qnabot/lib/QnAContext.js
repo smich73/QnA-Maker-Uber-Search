@@ -7,12 +7,18 @@ const entities = require("html-entities");
 const htmlentities = new entities.AllHtmlEntities();
 
 class QnAContext {
-    constructor(qnaMakerKey, name, docId, kbid, score) {
+    constructor(qnaMakerKey, name, docId, kbid, score, similarContexts, possibleQuestions) {
         this.name = name;
         this.docId = docId;
         this.kbid = kbid;
         this._qnaMakerKey = qnaMakerKey;
         this.score = score;
+        this.similarContexts = similarContexts;
+        this.possibleQuestions = possibleQuestions;
+    }
+
+    static fromState(contextState) {
+        return new QnAContext(contextState._qnaMakerKey, contextState.name, contextState.docId, contextState.kbid, contextState.similarContexts);
     }
 
     scoreQuestion(question) {
@@ -21,7 +27,7 @@ class QnAContext {
             let _this = this;
             var postBody = '{"question":"' + question + '", "top":' + numberOfRespones + '}';
             request({
-                url: 'https://westus.api.cognitive.microsoft.com/qnamaker/v2.0/knowledgebases/'+this.kbid+'/generateanswer',
+                url: 'https://westus.api.cognitive.microsoft.com/qnamaker/v2.0/knowledgebases/' + this.kbid + '/generateanswer',
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -30,8 +36,9 @@ class QnAContext {
                 body: postBody
             }, (error, response, body) => {
                 var result;
+                let isSuccessful = !error && response.statusCode === 200;
                 try {
-                    if (!error) {
+                    if (isSuccessful) {
                         result = JSON.parse(body);
                         var answerEntities = [];
                         if (result.answers !== null && result.answers.length > 0) {
@@ -50,8 +57,6 @@ class QnAContext {
                                 };
                                 answerEntities.push(answerEntity);
                             });
-                            result.score = result.answers[0].score;
-                            result.entities = answerEntities;
                         }
                     }
                 }
@@ -60,15 +65,11 @@ class QnAContext {
                     reject(e);
                 }
                 try {
-                    if (!error) {
-                        if (result.score = 0){
-                            resolve([]);
-                        } else {
-                            resolve(answerEntities);
-                        }
+                    if (isSuccessful) {
+                        resolve(answerEntities);
                     }
                     else {
-                        reject(error);
+                        reject(JSON.parse(body));
                     }
                 }
                 catch (e) {

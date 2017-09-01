@@ -3,6 +3,7 @@ const builder = require('botbuilder');
 const azureStorage = require('azure-storage');
 const search = require('azure-search-client');
 const ag = require('./lib/AggregateClient');
+const qna = require('./lib/QnAContext');
 
 const config = {
     searchName: process.env.SEARH_NAME,
@@ -65,6 +66,18 @@ server.listen(process.env.port || process.env.PORT || 3978, function () {
     });
 });
 
+function buildResponseMessage(session, response) {
+    var msg = new builder.Message(session);
+    msg.attachmentLayout(builder.AttachmentLayout.carousel)
+    msg.attachments([
+        new builder.HeroCard(session)
+            .title(response.questionMatched)
+            .subtitle(response.name)
+            .text(response.entity)
+    ]);
+    return msg;
+}
+
 function setupServer() {
     server.post('/api/messages', chatConnector.listen());
     var bot = new builder.UniversalBot(chatConnector);
@@ -84,18 +97,12 @@ function setupServer() {
             (session, args) => {
                 agClient.searchAndScore(args).then(
                     res => {
-                        if (res.length < 1) {
-                            session.replaceDialog('NotFound');
+                        if (res.length < 1 || res.score === 0) {
+                            session.replaceDialog('NotFound', null);
+                        } else {
+                            session.privateConversationData.questionContexts = res.contexts;
+                            builder.Prompts.text(session, buildResponseMessage(session, res.answers[0]));
                         }
-                        session.privateConversationData.questionContext = res[0].context;
-                        var msg = new builder.Message(session);
-                        msg.attachmentLayout(builder.AttachmentLayout.carousel)
-                        msg.attachments([
-                            new builder.HeroCard(session)
-                                .title(res[0].question)
-                                .text(res[0].answer)
-                        ]);
-                        builder.Prompts.text(session, msg);
                     },
                     err => {
                         session.send("Sorry I had a problem finding an answer to that question");
@@ -109,35 +116,78 @@ function setupServer() {
         ]
     );
 
-    bot.dialog('NotFound', 
-    [
-        (session, args) => {
-            builder.Prompts.text("I'm sorry we couldn't find any answers to that one, could you reword the question and retry?");
-        },
-        (session, result, args) => {
-            session.replaceDialog('TopLevelQuestion', result.reponse);
-        }
-    ]);
+    bot.dialog('NotFound',
+        [
+            (session, args) => {
+                if (session.privateConversationData.questionContexts) {
+                    session.replaceDialog('NotFoundWithContext');
+                } else {
+                    builder.Prompts.text(session, "Sorry I couldn't finde any answers to that one, can you reword the question and try again?");
+                }
 
+            },
+            (session, result, args) => {
+                session.replaceDialog('TopLevelQuestion', result.response);
+            }
+        ]);
+
+    bot.dialog('NotFoundWithContext',
+        [
+            (session, args) => {
+                if (session.privateConversationData.questionContexts) {
+                    builder.Prompts.choice(
+                        session,
+                        `I'm sorry we couldn't find any answers to that one under ${session.privateConversationData.questionContexts[0].name}, here are some options...`,
+                        [
+                            'Please try searching all answers',
+                            'Let me try a different Q',
+                            'Let me browse the document'
+                        ],
+                        { listStyle: builder.ListStyle.button }
+                    );
+                } else {
+                    session.replaceDialog('NotFound');
+                }
+            },
+            (session, result, args) => {
+                console.log(result);
+                session.replaceDialog('TopLevelQuestion', result.response);
+            }
+        ]);
+
+    // Check a question against the current qnaMaker Context
+    // If this is unable provide a good answer, requery at the top level. 
     bot.dialog('FollowupQuestion',
         [
             (session, args) => {
-                let context = session.privateConversationData.questionContext
+                // Score using the highest matching context
+                let context = qna.QnAContext.fromState(session.privateConversationData.questionContexts[0]);
                 context.scoreQuestion(args).then(
                     res => {
                         let topResult = res[0];
-                        if (topResult.score < 0.5) {
-                            session.replaceDialog('TopLevelQuestion', args.question);
+                        if (topResult.score > 0.9) {
+
+                            builder.Prompts.text(session, buildResponseMessage(session, topResult));
+                        } else if (topResult.score < 0.5) {
+                            // If we don't get a good result score using all the remaining contexts
+                            let contexts = session.privateConversationData.questionContexts.slice(1).map(x => qna.QnAContext.fromState(x));
+                            agClient.scoreRelivantAnswers(contexts, args, 3).then(
+                                res => {
+                                    let topResult = res[0];
+                                    if (topResult === undefined || topResult.score < 0.5) {
+                                        session.replaceDialog('NotFound', args);
+                                    } else {
+                                        builder.Prompts.text(session, buildResponseMessage(session, topResult));
+                                    }
+                                },
+                                err => {
+                                    session.send("Sorry I had a problem finding an answer to that question");
+                                    console.error(err);
+                                    session.endDialog();
+                                }
+                            )
+                        } else {
                         }
-                        session.privateConversationData.questionContext = res[0].context;
-                        var msg = new builder.Message(session);
-                        msg.attachmentLayout(builder.AttachmentLayout.carousel)
-                        msg.attachments([
-                            new builder.HeroCard(session)
-                                .title(res[0].question)
-                                .text(res[0].answer)
-                        ]);
-                        builder.Prompts.text(session, msg);
                     },
                     err => {
                         session.send("Sorry I had a problem finding an answer to that question");
@@ -146,7 +196,7 @@ function setupServer() {
                 )
             },
             (session, result, args) => {
-                session.replaceDialog('FollowupQuestion', result.reponse);
+                session.replaceDialog('FollowupQuestion', result.response);
             }
         ]
     );
