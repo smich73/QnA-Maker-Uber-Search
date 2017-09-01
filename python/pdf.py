@@ -25,7 +25,10 @@ def extract_text(filename):
         interpreter = PDFPageInterpreter(rsrcmgr, device)
         for page in PDFPage.get_pages(filepath):
             # page.rotate = (page.rotate + rotation) % 360
-            interpreter.process_page(page)
+            try:
+                interpreter.process_page(page)
+            except (UnicodeEncodeError ,UnicodeDecodeError) as e:
+                print('###### Failed to decode {0} document. Skipping...'.format(filepath))
         filepath.close()
         device.close()
 

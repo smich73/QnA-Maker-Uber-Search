@@ -115,9 +115,9 @@ def _extract_questions(row):
         filename = _get_filename(row)
         txt_filename = ("{}.txt".format(_get_filename(row)))
 
-        with open(txt_filename, 'rb') as text_file:
+        with open(txt_filename, 'r') as text_file:
             txt = text_file.read()
-            nlp_doc = NLP(txt.decode("utf8"))
+            nlp_doc = NLP(txt)
             qnadoc = QnaDoc(row[0], row[1], row[2], filename)
             qnadoc.add_metadata("Created", time.strftime("%H:%M:%S %m/%d/%Y"))
 
