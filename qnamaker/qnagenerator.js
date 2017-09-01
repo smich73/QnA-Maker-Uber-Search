@@ -8,6 +8,12 @@ var subKey = '';
 var qnaURL = '';
 var tableConnStr = '';
 
+var request = require('request');
+var headers = {
+    'Ocp-Apim-Subscription-Key': subKey,
+    'Content-Type': 'application/json'
+};
+
 var watcher = chokidar.watch(filepath);
 watcher
     .on('add', path => process(path))
@@ -194,49 +200,39 @@ function getDiff(existingQnA, newQnA) {
         }
     }
     else {
-        //TODO: DELETE QnA
+        console.log("QnA has no data. Deleting KB.");
+        deleteQnA(newQnA);
     }
 }
 
 function createQnA(qnaForUpload, callback) {
+    if (newQnA.qnaList.length > 0) {
+        // Configure the request
+        var options = {
+            url: qnaURL + 'create',
+            method: 'POST',
+            headers: headers,
+            json: qnaForUpload
+        };
 
-    var request = require('request');
+        // Start the request
+        request(options, function (error, response, body) {
 
-    // Set the headers
-    var headers = {
-        'Ocp-Apim-Subscription-Key': subKey,
-        'Content-Type': 'application/json'
-    };
-
-    // Configure the request
-    var options = {
-        url: qnaURL + 'create',
-        method: 'POST',
-        headers: headers,
-        json: qnaForUpload
-    };
-
-    // Start the request
-    request(options, function (error, response, body) {
-
-        if (!error && response.statusCode === 201) {
-            callback(body.kbId);
-        } else {
-            console.log("Error:", body, "Status code:", response.statusCode);
-            callback("Error");
-        }
-    });
+            if (!error && response.statusCode === 201) {
+                callback(body.kbId);
+            } else {
+                console.log("Error:", body, "Status code:", response.statusCode);
+                callback("Error");
+            }
+        });
+    }
+    else {
+        console.log("QnA has no data. QnAs left:", qnaCollection.length);
+        return;
+    }
 }
 
 function getQnA(kbID, callback) {
-    var request = require('request');
-
-    // Set the headers
-    var headers = {
-        'Ocp-Apim-Subscription-Key': subKey,
-        'Content-Type': 'application/json'
-    };
-
     // Configure the request
     var options = {
         url: qnaURL + kbID,
@@ -261,13 +257,6 @@ function updateQnA(patch, kbID, callback) {
         console.log("No change detected. QnAs left:", qnaCollection.length);
         return;
     }
-    var request = require('request');
-
-    // Set the headers
-    var headers = {
-        'Ocp-Apim-Subscription-Key': subKey,
-        'Content-Type': 'application/json'
-    };
 
     // Configure the request
     var options = {
@@ -285,6 +274,25 @@ function updateQnA(patch, kbID, callback) {
         } else {
             console.log("Error:", body, "Status code:", response.statusCode);
             callback("Error");
+        }
+    });
+}
+
+function deleteQnA(qna) {
+    // Configure the request
+    var options = {
+        url: qnaURL + kbID,
+        method: 'DELETE',
+        headers: headers
+    };
+
+    // Start the request
+    request(options, function (error, response, body) {
+
+        if (!error && response.statusCode === 204) {
+            console.log("Success: QnA deleted. QnA:", qna.name, "QnAs left:", qnaCollection.length);
+        } else {
+            console.log("Error:", body, "Status code:", response.statusCode);
         }
     });
 }
