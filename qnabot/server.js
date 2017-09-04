@@ -16,6 +16,10 @@ const config = {
     appPassword: process.env.MICROSOFT_APP_PASSWORD,
     qnaMakerEndpoint: "https://westus.api.cognitive.microsoft.com/qnamaker/v2.0/knowledgebases/",
     qnaMakerKey: process.env.QNAMAKER_KEY,
+    spellcheckEndpoint: process.env.SPELLCHECK_ENDPOINT,
+    spellcheckMode: process.env.SPELLCHECK_MODE,
+    spellcheckMkt: process.env.SPELLCHECK_MKT,
+    spellcheckKey: process.env.SPELLCHECK_KEY,
     choiceConfidenceDelta: 0.2, //If two items are returned and their scores are within this delta of each other the user is offered a choice. 
     qnaConfidencePrompt: 0.6, //If scores are lower than this users will be offered a choice. 
     qnaMinConfidence: 0.4, //Don't show answers below this level of confidence
@@ -150,7 +154,7 @@ function setupServer() {
     server.post('/api/messages', chatConnector.listen());
     var bot = new builder.UniversalBot(chatConnector);
     // Set up interceptor on all incoming messages (user -> Bot) for spellcheck
-    /*bot.use({
+    bot.use({
         botbuilder: function (session, next) {
              spellcheckMessage(session, next).then(
                 res => {
@@ -159,7 +163,7 @@ function setupServer() {
                     next();
                 });
         }
-    });*/
+    });
     bot.beginDialogAction('FollowupQuestionLowConfidence', 'FollowupQuestionLowConfidence');
     bot.beginDialogAction('FollowupQuestion', 'FollowupQuestion');
     bot.beginDialogAction('NotFound', 'NotFound');
@@ -333,8 +337,8 @@ function setupServer() {
                 questionAsked = session.privateConversationData.lastQuestion;
             }
 
-            //Check for any new contexts that might be relivant. 
-            agClient.findRelivantQnaDocs(questionAsked).then(
+            //Check for any new contexts that might be relevant.
+            agClient.findRelevantQnaDocs(questionAsked).then(
                 res => {
                     let currentContext = session.privateConversationData.selectedContext;
 
@@ -350,7 +354,7 @@ function setupServer() {
 
                     //TODO: Deduplicate contexts based on kbid. 
 
-                    agClient.scoreRelivantAnswers(contexts, questionAsked).then(
+                    agClient.scoreRelevantAnswers(contexts, questionAsked).then(
                         res => {
                             let topResult = res[0];
                             if (topResult === undefined) {

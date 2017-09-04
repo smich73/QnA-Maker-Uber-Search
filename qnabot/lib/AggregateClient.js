@@ -57,7 +57,7 @@ class AggregateClient {
         });
     }
 
-    findRelivantQnaDocs(question, top = 3) {
+    findRelevantQnaDocs(question, top = 3) {
         return new Promise((resolve, reject) => {
              this._searchClient.search(this._searchClient.indexName, { search: question, top: top }, (err, res) => {
                 if (err) {
@@ -73,7 +73,7 @@ class AggregateClient {
         });
     }
 
-    scoreRelivantAnswers(qnaDocList, question) {
+    scoreRelevantAnswers(qnaDocList, question) {
         return new Promise((resolve) => {
 
             var results = qnaDocList.map((doc) => {
@@ -101,9 +101,9 @@ class AggregateClient {
 
     searchAndScore(question, top = 3) {
         return new Promise((resolve, reject) => {
-            this.findRelivantQnaDocs(question, top).then(
+            this.findRelevantQnaDocs(question, top).then(
                 contexts => {
-                    this.scoreRelivantAnswers(contexts, question).then(
+                    this.scoreRelevantAnswers(contexts, question).then(
                         answers => {
                             resolve({
                                 contexts: utils.top(contexts, top),
