@@ -103,6 +103,13 @@ function buildResponseMessage(session, response) {
     return msg;
 }
 
+function decodeASCII(str) {
+    return str.replace( /&#([0-9]{1,7});/g, function( g, m1 ){
+    return String.fromCharCode( parseInt( m1, 10 ) );
+    }).replace( /&#[xX]([0-9a-fA-F]{1,6});/g, function( g, m1 ){
+    return String.fromCharCode( parseInt( m1, 16 ) );
+    });
+}
 
 function setupServer() {
     server.post('/api/messages', chatConnector.listen());
@@ -349,7 +356,7 @@ function setupServer() {
                                         .title(x.questionMatched)
                                         .subtitle("@" + x.name + ": " + x.questionMatched)
                                         .buttons([
-                                            builder.CardAction.imBack(session, `@${x.name}: ${x.questionMatched}`, `Ask this`)
+                                            builder.CardAction.imBack(session, `@${x.name}: ${decodeASCII(x.questionMatched)}`, `Ask this`)
                                         ])
                                 }));
 
