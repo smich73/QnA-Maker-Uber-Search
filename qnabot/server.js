@@ -1,5 +1,6 @@
 const restify = require('restify');
 const builder = require('botbuilder');
+const lodash = require('lodash');
 const azureStorage = require('azure-storage');
 const search = require('azure-search-client');
 const ag = require('./lib/AggregateClient');
@@ -113,8 +114,14 @@ function setupServer() {
             spellcheck.spellcheckMessage(session, next).then(
                 res => {
                     let result = res;
-                    session.message.text = result.corrected;
-                    console.log('Original:', result.original, 'Corrected:', result.corrected);
+                    if (result !== undefined){
+                        session.message.text = result.corrected;
+                        console.log('Original:', result.original, 'Corrected:', result.corrected);
+                    }
+                    else {
+                        session.message.text = result.original;
+                        console.log('ERROR SPELLCHECKING:', result.original);
+                    }
                     next();
                 });
         }
@@ -142,13 +149,13 @@ function setupServer() {
                 agClient.searchAndScore(questionAsked).then(
                     res => {
                         if (res.length < 1 || res.score === 0 || res.score < config.qnaMinConfidence) {
-                            //TODO: In low confidence scenario office available contexts for user to pick. 
+                            //TODO: In low confidence scenario offer available contexts for user to pick. 
                             session.replaceDialog('NotFound', null);
                         } else {
                             session.privateConversationData.questionContexts = res.contexts;
 
                             //Todo: Should this be moved into the aggregate client? 
-                            // I think potentially this sits better as part of it's concerns. 
+                            // I think potentially this sits better as part of its concerns. 
                             let options = [];
                             let scoreToBeat = res.contexts[0].score - config.choiceConfidenceDelta;
                             res.contexts.forEach(currentContext => {
@@ -166,7 +173,7 @@ function setupServer() {
                         }
                     },
                     err => {
-                        session.send('Sorry I had a problem finding an answer to that question');
+                        session.send('Sorry, I had a problem finding an answer to that question');
                         console.error(err);
                     }
                 );
@@ -247,29 +254,34 @@ function setupServer() {
     bot.dialog('FollowupQuestion',
         [
             (session, args) => {
-                let questionAsked = args.question;
+                if (args !== undefined){
+                    let questionAsked = args.question;
 
-                //Handle users selecting to change context for a followup question. 
-                if (args.context !== undefined) {
-                    session.privateConversationData.selectedContext = args.context;
-                }
-
-                // Score using the highest matching context
-                let context = qna.QnAContext.fromState(session.privateConversationData.selectedContext);
-                context.scoreQuestion(questionAsked).then(
-                    res => {
-                        let topResult = res[0];
-                        if (topResult.score > config.qnaConfidencePrompt) {
-                            builder.Prompts.text(session, buildResponseMessage(session, topResult));
-                        } else {
-                            session.replaceDialog('FollowupQuestionLowConfidence', questionAsked);
-                        }
-                    },
-                    err => {
-                        session.send("Sorry I had a problem finding an answer to that question");
-                        console.error(err);
+                    //Handle users selecting to change context for a followup question. 
+                    if (args.context !== undefined) {
+                        session.privateConversationData.selectedContext = args.context;
                     }
-                )
+
+                    // Score using the highest matching context
+                    let context = qna.QnAContext.fromState(session.privateConversationData.selectedContext);
+                    context.scoreQuestion(questionAsked).then(
+                        res => {
+                            let topResult = res[0];
+                            if (topResult.score > config.qnaConfidencePrompt) {
+                                builder.Prompts.text(session, buildResponseMessage(session, topResult));
+                            } else {
+                                session.replaceDialog('FollowupQuestionLowConfidence', questionAsked);
+                            }
+                        },
+                        err => {
+                            session.send("Sorry I had a problem finding an answer to that question");
+                            console.error(err);
+                        }
+                    )
+                }
+                else {
+                    session.replaceDialog('NotFound');
+                }
             },
             (session, result, args) => {
                 session.privateConversationData.lastQuestion = result.response;
@@ -301,7 +313,7 @@ function setupServer() {
                     //Add in the existing contexts that are being tracked. 
                     let contexts = session.privateConversationData.questionContexts.map(x => qna.QnAContext.fromState(x));
                     if (res !== undefined && res.length > 1) {
-                        contexts.push(...res);
+                            contexts.push(...res);
                     }
 
                     //TOBO: Does this steadily bloat the contexts over a chat? Yes
@@ -318,7 +330,7 @@ function setupServer() {
                             } else {
                                 let answers = utils.top(res.filter(x=>x.score > config.qnaMinConfidence), 3);
                                 let attachments = [new builder.HeroCard(session)
-                                .text(`We've found some answers but we're not sure if they're a good fit, you may have changed topics. We included what you can ask in @${currentContext.name} aswell as some alternatives`)];
+                                .text(`We've found some answers but we're not sure if they're a good fit, you may have changed topics. We included what you can ask in @${currentContext.name}, as well as some alternatives`)];
                                 
                                 //If none of these answers are from the current context
                                 // offer the user the option to see what he can ask in that context
@@ -335,7 +347,7 @@ function setupServer() {
                                 attachments.push(...answers.map(x => {
                                     return new builder.HeroCard(session)
                                         .title(x.questionMatched)
-                                        .subtitle("@" + x.name)
+                                        .subtitle("@" + x.name + ": " + x.questionMatched)
                                         .buttons([
                                             builder.CardAction.imBack(session, `@${x.name}: ${x.questionMatched}`, `Ask this`)
                                         ])
