@@ -17,7 +17,10 @@ const config = {
     qnaMakerEndpoint: "https://westus.api.cognitive.microsoft.com/qnamaker/v2.0/knowledgebases/",
     qnaMakerKey: process.env.QNAMAKER_KEY,
     choiceConfidenceDelta: 0.2, //If two items are returned and their scores are within this delta of each other the user is offered a choice. 
-    qnaConfidencePrompt: 0.6 //If scores are lower than this users will be offered a choice. 
+    qnaConfidencePrompt: 0.6, //If scores are lower than this users will be offered a choice. 
+    qnaMinConfidence: 0.4, //Don't show answers below this level of confidence
+    answerUncertainWarning: 0.85, //If scores are lower than this a warning is shown.
+    searchConfidence: 0.7
 };
 
 const chatConnector = new builder.ChatConnector({
@@ -35,7 +38,7 @@ tableClient.lookupTableName = config.lookupTableName;
 const searchClient = new search.SearchClient(config.searchName, config.searchKey);
 searchClient.indexName = config.searchIndexName;
 
-const agClient = new ag.AggregateClient(searchClient, tableClient, config.qnaMakerKey);
+const agClient = new ag.AggregateClient(searchClient, tableClient, config.qnaMakerKey, config.searchConfidence);
 
 
 let isServerReady = false;
@@ -73,14 +76,22 @@ server.listen(process.env.port || process.env.PORT || 3978, function () {
 });
 
 function buildResponseMessage(session, response) {
-    var msg = new builder.Message(session);
-    msg.attachmentLayout(builder.AttachmentLayout.carousel)
-    msg.attachments([
+    let attachment =
         new builder.HeroCard(session)
             .title(response.questionMatched)
-            .subtitle(response.name)
-            .text(response.entity)
-    ]);
+            .subtitle("@" + response.name)
+            .text(response.entity);
+
+    if (response.score < config.answerUncertainWarning) {
+        attachment = attachment.buttons([
+            builder.CardAction.dialogAction(session, 'FollowupQuestionLowConfidence', null, 'Not the right answer? Click here')
+        ])
+    }
+
+
+    var msg = new builder.Message(session);
+    msg.attachmentLayout(builder.AttachmentLayout.carousel)
+    msg.attachments([attachment]);
     msg.inputHint = "expectingInput";
     return msg;
 }
@@ -88,6 +99,9 @@ function buildResponseMessage(session, response) {
 function setupServer() {
     server.post('/api/messages', chatConnector.listen());
     var bot = new builder.UniversalBot(chatConnector);
+    bot.beginDialogAction('FollowupQuestionLowConfidence', 'FollowupQuestionLowConfidence');
+    bot.beginDialogAction('FollowupQuestion', 'FollowupQuestion');
+    bot.beginDialogAction('NotFound', 'NotFound');
 
     bot.dialog('/',
         [
@@ -106,7 +120,7 @@ function setupServer() {
                 session.privateConversationData.lastQuestion = questionAsked;
                 agClient.searchAndScore(questionAsked).then(
                     res => {
-                        if (res.length < 1 || res.score === 0) {
+                        if (res.length < 1 || res.score === 0 || res.score < config.qnaMinConfidence) {
                             //TODO: In low confidence scenario office available contexts for user to pick. 
                             session.replaceDialog('NotFound', null);
                         } else {
@@ -137,7 +151,8 @@ function setupServer() {
                 );
             },
             (session, result, args) => {
-                session.replaceDialog('FollowupQuestion', result.response);
+                session.privateConversationData.lastQuestion = result.response;
+                session.replaceDialog('FollowupQuestion', { question: result.response });
             }
         ]
     );
@@ -156,7 +171,7 @@ function setupServer() {
                 session.replaceDialog('NotFound');
             } else {
                 session.privateConversationData.selectedContext = session.privateConversationData.questionContexts[result.response.index];
-                session.replaceDialog('FollowupQuestion', session.privateConversationData.lastQuestion);
+                session.replaceDialog('FollowupQuestion', { question: session.privateConversationData.lastQuestion });
             }
         }
     ]);
@@ -180,12 +195,11 @@ function setupServer() {
         [
             (session, args) => {
                 if (session.privateConversationData.selectedContext) {
-                    //TODO: Offer available questions....
-                    let options = session.privateConversationData.selectedContext.possibleQuestions;
+                    let options = session.privateConversationData.selectedContext.possibleQuestions.slice(0); //Take a copy otherwise changes get saved to state
                     options.push('None of these are useful');
                     builder.Prompts.choice(
-                        session, 
-                        `I'm sorry we couldn't find a good answer to that one in "${session.privateConversationData.selectedContext.name}". We can answer these, are any of these useful?`, options,
+                        session,
+                        `I'm sorry we couldn't find a good answer to that one in @${session.privateConversationData.selectedContext.name}. We can answer these, are any of these useful?`, options,
                         { listStyle: builder.ListStyle.button });
 
                 } else {
@@ -194,12 +208,14 @@ function setupServer() {
             },
             (session, result, args) => {
                 // User didn't find a question that was right 
+                
                 if (result.response.index > session.privateConversationData.selectedContext.possibleQuestions.length - 1) {
                     session.privateConversationData.selectedContext = null;
                     session.replaceDialog('NotFound');
-                    
+
                 } else {
-                    session.replaceDialog('FollowupQuestion', result.response.entity);
+                    session.privateConversationData.lastQuestion = result.response.entity;
+                    session.replaceDialog('FollowupQuestion', { question: result.response.entity });
 
                 }
             }
@@ -210,7 +226,13 @@ function setupServer() {
     bot.dialog('FollowupQuestion',
         [
             (session, args) => {
-                let questionAsked = args;
+                let questionAsked = args.question;
+
+                //Handle users selecting to change context for a followup question. 
+                if (args.context !== undefined) {
+                    session.privateConversationData.selectedContext = args.context;
+                }
+
                 // Score using the highest matching context
                 let context = qna.QnAContext.fromState(session.privateConversationData.selectedContext);
                 context.scoreQuestion(questionAsked).then(
@@ -219,7 +241,7 @@ function setupServer() {
                         if (topResult.score > config.qnaConfidencePrompt) {
                             builder.Prompts.text(session, buildResponseMessage(session, topResult));
                         } else {
-                            session.replaceDialog('FollowupQuestionLowConfidence', { answers: res, questionAsked: questionAsked });
+                            session.replaceDialog('FollowupQuestionLowConfidence', questionAsked);
                         }
                     },
                     err => {
@@ -229,45 +251,89 @@ function setupServer() {
                 )
             },
             (session, result, args) => {
-                session.replaceDialog('FollowupQuestion', result.response);
+                session.privateConversationData.lastQuestion = result.response;
+                session.replaceDialog('FollowupQuestion', { question: result.response });
             }
         ]
     );
 
+    // Handle low confidence scenarios
+    //  As we're unsure on how to answer this question we use a 2 fold approach
+    //
+    //  1. We consult the existing question context and related contexts
+    //  2. We also requery azure search to see if it returns and new contexts
+    //
+    // These are then all score and top options presented to the user. 
     bot.dialog('FollowupQuestionLowConfidence', [
         (session, args) => {
-            let results = args.answers;
-            let questionAsked = args.questionAsked;
+            let questionAsked = args;
 
-            // If we don't get a good result score using all the remaining contexts
-            let contexts = session.privateConversationData.questionContexts.map(x => qna.QnAContext.fromState(x));
-            agClient.scoreRelivantAnswers(contexts, questionAsked, 3).then(
+            if (questionAsked === undefined) {
+                questionAsked = session.privateConversationData.lastQuestion;
+            }
+
+            //Check for any new contexts that might be relivant. 
+            agClient.findRelivantQnaDocs(questionAsked).then(
                 res => {
-                    let topResult = res[0];
-                    if (topResult === undefined || topResult.score < 0.3) {
-                        session.replaceDialog('NotFound', args);
-                    } else {
-                        var msg = new builder.Message(session);
-                        msg.inputHint = "expectingInput";
-                        msg.text("We've found some answers but we're not sure if they're a good fit. Do any of these work?");
-                        session.send(msg);
+                    let currentContext = session.privateConversationData.selectedContext;
 
-                        let attachments = utils.top(res, 3).map(x => {
-                            return new builder.HeroCard(session)
-                            .title(x.questionMatched)
-                            .subtitle(x.name)
-                            .buttons([
-                                builder.CardAction.imBack(session, x.questionMatched, "This one please!")
-                            ])
-                        });
-
-                        var msg = new builder.Message(session);
-                        msg.attachmentLayout(builder.AttachmentLayout.list)
-                        msg.attachments(attachments);
-                        msg.inputHint = "expectingInput";
-                                      
-                        builder.Prompts.text(session, msg);
+                    //Add in the existing contexts that are being tracked. 
+                    let contexts = session.privateConversationData.questionContexts.map(x => qna.QnAContext.fromState(x));
+                    if (res !== undefined && res.length > 1) {
+                        contexts.push(...res);
                     }
+
+                    //TOBO: Does this steadily bloat the contexts over a chat? Yes
+                    // What should we do?
+                    session.privateConversationData.questionContexts = contexts;
+
+                    //TODO: Deduplicate contexts based on kbid. 
+
+                    agClient.scoreRelivantAnswers(contexts, questionAsked).then(
+                        res => {
+                            let topResult = res[0];
+                            if (topResult === undefined) {
+                                session.replaceDialog('NotFound', args);
+                            } else {
+                                let answers = utils.top(res.filter(x=>x.score > config.qnaMinConfidence), 3);
+                                let attachments = [new builder.HeroCard(session)
+                                .text(`We've found some answers but we're not sure if they're a good fit, you may have changed topics. We included what you can ask in @${currentContext.name} aswell as some alternatives`)];
+                                
+                                //If none of these answers are from the current context
+                                // offer the user the option to see what he can ask in that context
+                                if (answers.filter(x=>x.name === currentContext.name).length < 1){
+                                    attachments.push(
+                                        new builder.HeroCard(session)
+                                        .title("@" + currentContext.name)
+                                        .subtitle("No answers found for this area")
+                                        .buttons([
+                                        builder.CardAction.dialogAction(session, "NotFound", null, "What can I ask?")])
+                                    );
+                                }
+                                
+                                attachments.push(...answers.map(x => {
+                                    return new builder.HeroCard(session)
+                                        .title(x.questionMatched)
+                                        .subtitle("@" + x.name)
+                                        .buttons([
+                                            builder.CardAction.imBack(session, `@${x.name}: ${x.questionMatched}`, `Ask this`)
+                                        ])
+                                }));
+
+                                var msg = new builder.Message(session);
+                                msg.attachmentLayout(builder.AttachmentLayout.list)
+                                msg.attachments(attachments);
+                                msg.inputHint = "expectingInput";
+
+                                builder.Prompts.text(session, msg);
+                            }
+                        },
+                        err => {
+                            session.send("Sorry I had a problem finding an answer to that question");
+                            console.error(err);
+                            session.endDialog();
+                        }
+                    )
                 },
                 err => {
                     session.send("Sorry I had a problem finding an answer to that question");
@@ -277,7 +343,19 @@ function setupServer() {
             )
         },
         (session, result, args) => {
-            session.replaceDialog('FollowupQuestion', result.response);
+            let text = result.response;
+            if (text.includes('@') && text.includes(':')) {
+                let indexOfSeperator = text.indexOf(':');
+                let contextName = text.substring(1, indexOfSeperator);
+                let question = text.substring(indexOfSeperator + 1);
+                let context = session.privateConversationData.questionContexts.filter(x => x.name === contextName)[0];
+
+                session.replaceDialog('FollowupQuestion', { question: question, context: context });
+
+            } else {
+                session.privateConversationData.lastQuestion = result.response;
+                session.replaceDialog('FollowupQuestion', { question: result.response });
+            }
         }
     ])
 }
