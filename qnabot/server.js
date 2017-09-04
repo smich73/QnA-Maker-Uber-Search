@@ -5,6 +5,7 @@ const search = require('azure-search-client');
 const ag = require('./lib/AggregateClient');
 const qna = require('./lib/QnAContext');
 const utils = require('./lib/Utils');
+const sp = require('./lib/Spellcheck');
 
 const config = {
     searchName: process.env.SEARH_NAME,
@@ -43,6 +44,7 @@ const searchClient = new search.SearchClient(config.searchName, config.searchKey
 searchClient.indexName = config.searchIndexName;
 
 const agClient = new ag.AggregateClient(searchClient, tableClient, config.qnaMakerKey, config.searchConfidence);
+const spellcheck = new sp.Spellcheck(config.spellcheckMode, config.spellcheckMkt, config.spellcheckEndpoint, config.spellcheckKey);
 
 
 let isServerReady = false;
@@ -100,55 +102,6 @@ function buildResponseMessage(session, response) {
     return msg;
 }
 
-function spellcheckMessage(session, next) {
-    const request = require('request');
-    return new Promise((resolve, reject) => {
-        var query = '?text=' + session.message.text + '&mode=' + config.spellcheckMode + '&mkt=' + config.spellcheckMkt;
-        request({
-            url: config.spellcheckEndpoint + query,
-            method: 'GET',
-            headers: {
-                'Ocp-Apim-Subscription-Key': config.spellcheckKey
-            }
-        }, (error, response, body) => {
-            var result;
-            let isSuccessful = !error && response.statusCode === 200;
-
-            let spellcheckPair = {
-                'original': session.message.text,
-                'corrected': session.message.text
-            };
-
-            try {
-                if (isSuccessful) {
-                    result = JSON.parse(body);
-
-                    if (result.flaggedTokens !== null && result.flaggedTokens.length > 0) {
-                        for (var i = 0; i < result.flaggedTokens.length; i++) {
-                            spellcheckPair.corrected = spellcheckPair.corrected.replace(result.flaggedTokens[i].token, result.flaggedTokens[i].suggestions[0].suggestion);
-                        }
-                        //console.log(spellcheckPair.corrected);
-                    }
-                }
-            }
-            catch (e) {
-                error = e;
-                reject(e);
-            }
-            try {
-                if (isSuccessful) {
-                    resolve(spellcheckPair);
-                }
-                else {
-                    reject(JSON.parse(body));
-                }
-            }
-            catch (e) {
-                reject(e);
-            }
-        });
-    });
-}
 
 function setupServer() {
     server.post('/api/messages', chatConnector.listen());
@@ -156,7 +109,7 @@ function setupServer() {
     // Set up interceptor on all incoming messages (user -> Bot) for spellcheck
     bot.use({
         botbuilder: function (session, next) {
-             spellcheckMessage(session, next).then(
+            spellcheck.spellcheckMessage(session, next).then(
                 res => {
                     let result = res.corrected;
                     console.log(result);
