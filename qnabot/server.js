@@ -106,18 +106,20 @@ function buildResponseMessage(session, response) {
 function setupServer() {
     server.post('/api/messages', chatConnector.listen());
     var bot = new builder.UniversalBot(chatConnector);
+
     // Set up interceptor on all incoming messages (user -> Bot) for spellcheck
     bot.use({
         botbuilder: function (session, next) {
             spellcheck.spellcheckMessage(session, next).then(
                 res => {
-                    let result = res.corrected;
-                    session.message.text = result;
-                    console.log("spellchecked" + result);
+                    let result = res;
+                    session.message.text = result.corrected;
+                    console.log('Original:', result.original, 'Corrected:', result.corrected);
                     next();
                 });
         }
     });
+
     bot.beginDialogAction('FollowupQuestionLowConfidence', 'FollowupQuestionLowConfidence');
     bot.beginDialogAction('FollowupQuestion', 'FollowupQuestion');
     bot.beginDialogAction('NotFound', 'NotFound');
