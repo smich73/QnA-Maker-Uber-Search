@@ -112,7 +112,8 @@ function setupServer() {
             spellcheck.spellcheckMessage(session, next).then(
                 res => {
                     let result = res.corrected;
-                    console.log(result);
+                    session.message.text = result;
+                    console.log("spellchecked" + result);
                     next();
                 });
         }
