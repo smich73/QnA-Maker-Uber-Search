@@ -2,15 +2,15 @@
 
 const Promise = require('promise');
 const qna = require('./QnAContext');
+const utils = require('./Utils')
 const azureStorage = require('azure-storage')
 
 class AggregateClient {
-    constructor(searchClient, tableClient, qnaMakerKey, searchConfidence = 0.7, qnaConfidence = 0.7) {
+    constructor(searchClient, tableClient, qnaMakerKey, searchConfidence = 0.7) {
         this._searchClient = searchClient;
         this._qnaMakerKey = qnaMakerKey;
         this._tableClient = tableClient;
         this._searchConfidence = searchConfidence;
-        this._qnaConfidence = qnaConfidence;
     }
 
     _lookupQna(item) {
@@ -30,6 +30,7 @@ class AggregateClient {
                         item.source,
                         kbId,
                         item["@search.score"],
+                        null, //TODO: Add in similar contexts here!
                         JSON.parse(item.questions)
                     );
 
@@ -56,14 +57,6 @@ class AggregateClient {
         });
     }
 
-    _top(arr, t) {
-        if (t <= arr.length) {
-            return arr.slice(0, t - 1);
-        } else {
-            return arr;
-        }
-    }
-
     findRelivantQnaDocs(question, top = 3) {
         return new Promise((resolve, reject) => {
              this._searchClient.search(this._searchClient.indexName, { search: question, top: top }, (err, res) => {
@@ -83,7 +76,7 @@ class AggregateClient {
     scoreRelivantAnswers(qnaDocList, question, numToScore) {
         return new Promise((resolve) => {
 
-            var results = this._top(qnaDocList, numToScore).map((doc) => {
+            var results = utils.top(qnaDocList, numToScore).map((doc) => {
                 return doc.scoreQuestion(question)
             });
 
@@ -99,9 +92,7 @@ class AggregateClient {
                 res.forEach(answers => {
                     allAnwers.push(...answers);
                 });
-                allAnwers = allAnwers
-                    .filter(a => a.score > this._qnaConfidence)
-                    .sort((a, b) => b.score - a.score);
+                allAnwers = allAnwers.sort((a, b) => b.score - a.score);
                 
                 resolve(allAnwers);
             });
@@ -115,7 +106,7 @@ class AggregateClient {
                     this.scoreRelivantAnswers(contexts, question, top).then(
                         answers => {
                             resolve({
-                                contexts: this._top(contexts, top),
+                                contexts: utils.top(contexts, top),
                                 answers: answers
                             });
                         },
