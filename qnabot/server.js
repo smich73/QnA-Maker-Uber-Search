@@ -178,7 +178,7 @@ function setupServer() {
 
     bot.dialog('SelectContext', [
         (session, args) => {
-            let options = session.privateConversationData.questionContexts.map(x => x.name);
+            let options = session.privateConversationData.questionContexts.map(x => '@' + x.name);
             options.push('None of the above');
             builder.Prompts.choice(
                 session,
@@ -287,7 +287,7 @@ function setupServer() {
         (session, args) => {
             let questionAsked = args;
 
-            if (questionAsked === undefined) {
+            if (questionAsked === undefined || args.action !== undefined) {
                 questionAsked = session.privateConversationData.lastQuestion;
             }
 
@@ -314,13 +314,15 @@ function setupServer() {
                             if (topResult === undefined) {
                                 session.replaceDialog('NotFound', args);
                             } else {
-                                let answers = utils.top(res.filter(x=>x.score > config.qnaMinConfidence), 3);
+                                let answersFromCurrentContext = utils.top(res.filter(x=>x.score > config.qnaMinConfidence && x.docId === currentContext.docId), 3);
+
+                                let answersFromOtherContexts = utils.top(res.filter(x=>x.score > config.qnaMinConfidence && x.docId !== currentContext.docId), 3);
                                 let attachments = [new builder.HeroCard(session)
-                                .text(`We've found some answers but we're not sure if they're a good fit, you may have changed topics. We included what you can ask in @${currentContext.name} aswell as some alternatives`)];
+                                .text(`We've found some answers but we're not sure if they're a good fit, you may have changed topics`)];
                                 
                                 //If none of these answers are from the current context
                                 // offer the user the option to see what he can ask in that context
-                                if (answers.filter(x=>x.name === currentContext.name).length < 1){
+                                if (answersFromCurrentContext.length < 1){
                                     attachments.push(
                                         new builder.HeroCard(session)
                                         .title("@" + currentContext.name)
@@ -328,9 +330,18 @@ function setupServer() {
                                         .buttons([
                                         builder.CardAction.dialogAction(session, "NotFound", null, "What can I ask?")])
                                     );
+                                } else {
+                                    attachments.push(...answersFromCurrentContext.map(x => {
+                                        return new builder.HeroCard(session)
+                                            .title(x.questionMatched)
+                                            .subtitle("@" + x.name)
+                                            .buttons([
+                                                builder.CardAction.imBack(session, `@${x.name}: ${x.questionMatched}`, `Ask this`)
+                                            ])
+                                    }));
                                 }
                                 
-                                attachments.push(...answers.map(x => {
+                                attachments.push(...answersFromOtherContexts.map(x => {
                                     return new builder.HeroCard(session)
                                         .title(x.questionMatched)
                                         .subtitle("@" + x.name)
