@@ -84,7 +84,7 @@ class AggregateClient {
             // Catch any errors that are returned from promises
             // as promise.all will complete on first reject
             var results = results.map(p => p.catch(e => {
-                console.error(`Failed scoring result: ${e}`);
+                console.error(`Failed scoring result: ${JSON.stringify(e)}`);
                 return [];
             }));
 

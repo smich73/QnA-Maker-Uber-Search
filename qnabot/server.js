@@ -130,19 +130,13 @@ function setupServer() {
                 if (result !== undefined) {
                     session.message.text = result.corrected;
                     console.log('Original:', result.original, 'Corrected:', result.corrected);
-                    if (session.privateConversationData.selectedContext !== undefined){
-                        console.log('Context:', session.privateConversationData.selectedContext.name);
-                    }
-                    else {
-                        console.log('No context found');
-                    }
                 }
                 else {
                     session.message.text = result.original;
                     console.log('ERROR SPELLCHECKING:', result.original);
                 }
+                next();
             });
-            next();
         }
     });
 
@@ -234,7 +228,20 @@ function setupServer() {
                         questionSegments[1] = questionSegments[1].substring(1).replace('?', '');
                     }
                     session.privateConversationData.lastQuestion = questionSegments[1];
-                    questionAsked = questionSegments[1] + ' of ' + questionSegments[0];
+                    var contextWords = questionSegments[0].split(' ');
+
+                    var conditionWordInQuestion = false;
+                    for (var i = 0; i < contextWords.length; i++){
+                        if (questionSegments[1].indexOf(contextWords[i]) !== -1) {
+                            conditionWordInQuestion = true;
+                        }
+                    }
+                    if (!conditionWordInQuestion){
+                        questionAsked = questionSegments[1] + ' of ' + questionSegments[0];
+                    }
+                    else {
+                        questionAsked = questionSegments[1];
+                    }
                 }
 
                 session.privateConversationData.lastQuestion = questionAsked;
@@ -497,7 +504,7 @@ function setupServer() {
                     session.endDialog();
                 }
             )
-        },
+        }/* ,
         (session, result, args) => {
             let text = result.response;
             if (text.includes('@') && text.includes(':')) {
@@ -520,7 +527,7 @@ function setupServer() {
                 session.privateConversationData.lastQuestion = result.response;
                 session.replaceDialog('FollowupQuestion', { question: result.response });
             }
-        }
+        } */
     ])
 }
 
