@@ -117,7 +117,7 @@ function setupServer() {
             \n\nType \'help\' at any time to display this message again.`);
         },
         (session, results, args) => {
-            session.replaceDialog('TopLevelQuestion', results.response);
+            return session.replaceDialog('TopLevelQuestion', results.response);
         }
     ]);
 
@@ -125,18 +125,18 @@ function setupServer() {
     bot.use({
         botbuilder: function (session, next) {
             spellcheck.spellcheckMessage(session, next).then(
-            res => {
-                let result = res;
-                if (result !== undefined) {
-                    session.message.text = result.corrected;
-                    console.log('Original:', result.original, 'Corrected:', result.corrected);
-                }
-                else {
-                    session.message.text = result.original;
-                    console.log('ERROR SPELLCHECKING:', result.original);
-                }
-                next();
-            });
+                res => {
+                    let result = res;
+                    if (result !== undefined) {
+                        session.message.text = result.corrected;
+                        console.log('Original:', result.original, 'Corrected:', result.corrected);
+                    }
+                    else {
+                        session.message.text = result.original;
+                        console.log('ERROR SPELLCHECKING:', result.original);
+                    }
+                    next();
+                });
         }
     });
 
@@ -147,10 +147,10 @@ function setupServer() {
     bot.dialog('Help', [
         (session, args, next) => {
             var contextDetails;
-            if (session.privateConversationData.selectedContext === undefined){
+            if (session.privateConversationData.selectedContext === undefined) {
                 contextDetails = 'You don\'t currently have a context. Please ask a question about a medical condition to continue.';
             }
-            else{
+            else {
                 contextDetails = 'Your current context is: @' + session.privateConversationData.selectedContext.name;
             }
 
@@ -164,7 +164,7 @@ function setupServer() {
             \nType \'help\' at any time to display this message again.`);
         },
         (session, result, args) => {
-            session.replaceDialog('FollowupQuestion', { question: result.response });
+            return session.replaceDialog('FollowupQuestion', { question: result.response });
         }
     ])
         .triggerAction({
@@ -187,7 +187,7 @@ function setupServer() {
                     { listStyle: builder.ListStyle.button });
 
             } else {
-                session.replaceDialog('NotFound');
+                return session.replaceDialog('NotFound');
             }
         },
         (session, result, args) => {
@@ -195,12 +195,12 @@ function setupServer() {
 
             if (result.response.index > session.privateConversationData.selectedContext.possibleQuestions.length - 1) {
                 session.privateConversationData.selectedContext = null;
-                session.replaceDialog('NotFound');
+                return session.replaceDialog('NotFound');
 
             } else {
                 let originalQuestion = session.privateConversationData.lastQuestion;
                 session.privateConversationData.lastQuestion = result.response.entity;
-                session.replaceDialog('FollowupQuestion', { question: result.response.entity, originalQuestion: originalQuestion });
+                return session.replaceDialog('FollowupQuestion', { question: result.response.entity, originalQuestion: originalQuestion });
 
             }
         }
@@ -218,25 +218,25 @@ function setupServer() {
         [
             (session, args) => {
                 let questionAsked = args;
-                if (questionAsked.charAt(0) === '@'){
+                if (questionAsked.charAt(0) === '@') {
                     questionAsked = questionAsked.substring(1);
                 }
                 var questionSegments = questionAsked.split(':');
 
-                if (questionSegments.length > 1){
-                    if (questionSegments[1].charAt(0) === ' '){
+                if (questionSegments.length > 1) {
+                    if (questionSegments[1].charAt(0) === ' ') {
                         questionSegments[1] = questionSegments[1].substring(1).replace('?', '');
                     }
                     session.privateConversationData.lastQuestion = questionSegments[1];
                     var contextWords = questionSegments[0].split(' ');
 
                     var conditionWordInQuestion = false;
-                    for (var i = 0; i < contextWords.length; i++){
+                    for (var i = 0; i < contextWords.length; i++) {
                         if (questionSegments[1].indexOf(contextWords[i]) !== -1) {
                             conditionWordInQuestion = true;
                         }
                     }
-                    if (!conditionWordInQuestion){
+                    if (!conditionWordInQuestion) {
                         questionAsked = questionSegments[1] + ' of ' + questionSegments[0];
                     }
                     else {
@@ -250,7 +250,7 @@ function setupServer() {
                     res => {
                         if (res.length < 1 || res.score === 0 || res.score < config.qnaMinConfidence) {
                             //TODO: In low confidence scenario offer available contexts for user to pick. 
-                            session.replaceDialog('NotFound', null);
+                            return session.replaceDialog('NotFound', null);
                         } else {
                             session.privateConversationData.questionContexts = res.contexts;
 
@@ -265,7 +265,7 @@ function setupServer() {
                             });
 
                             if (options.length > 1) {
-                                session.replaceDialog('SelectContext', questionAsked);
+                                return session.replaceDialog('SelectContext', questionAsked);
                             } else {
                                 session.privateConversationData.selectedContext = res.contexts[0];
                                 builder.Prompts.text(session, buildResponseMessage(session, res.answers[0]));
@@ -279,8 +279,12 @@ function setupServer() {
                 );
             },
             (session, result, args) => {
+                //Todo: Fixup temp workaround
+                if (result.response === 'action?not found') {
+                    return session.replaceDialog('NotFound');
+                }
                 session.privateConversationData.lastQuestion = result.response;
-                session.replaceDialog('FollowupQuestion', { question: result.response });
+                return session.replaceDialog('FollowupQuestion', { question: result.response });
             }
         ])
         .triggerAction({
@@ -303,10 +307,10 @@ function setupServer() {
         },
         (session, result, args) => {
             if (result.response.index > session.privateConversationData.questionContexts.length - 1) {
-                session.replaceDialog('NotFound');
+                return session.replaceDialog('NotFound');
             } else {
                 session.privateConversationData.selectedContext = session.privateConversationData.questionContexts[result.response.index];
-                session.replaceDialog('FollowupQuestion', { question: session.privateConversationData.lastQuestion });
+                return session.replaceDialog('FollowupQuestion', { question: session.privateConversationData.lastQuestion });
             }
         }
     ]);
@@ -315,14 +319,14 @@ function setupServer() {
         [
             (session, args) => {
                 if (session.privateConversationData.selectedContext) {
-                    session.replaceDialog('NotFoundWithContext');
+                    return session.replaceDialog('NotFoundWithContext');
                 } else {
                     builder.Prompts.text(session, "Sorry we couldn't find any answers to that one, can you reword the question and try again?");
                 }
 
             },
             (session, result, args) => {
-                session.replaceDialog('TopLevelQuestion', result.response);
+                return session.replaceDialog('TopLevelQuestion', result.response);
             }
         ]);
 
@@ -338,7 +342,7 @@ function setupServer() {
                         { listStyle: builder.ListStyle.button });
 
                 } else {
-                    session.replaceDialog('NotFound');
+                    return session.replaceDialog('NotFound');
                 }
             },
             (session, result, args) => {
@@ -346,12 +350,12 @@ function setupServer() {
 
                 if (result.response.index > session.privateConversationData.selectedContext.possibleQuestions.length - 1) {
                     session.privateConversationData.selectedContext = null;
-                    session.replaceDialog('NotFound');
+                    return session.replaceDialog('NotFound');
 
                 } else {
                     let originalQuestion = session.privateConversationData.lastQuestion;
                     session.privateConversationData.lastQuestion = result.response.entity;
-                    session.replaceDialog('FollowupQuestion', { question: result.response.entity, originalQuestion: originalQuestion });
+                    return session.replaceDialog('FollowupQuestion', { question: result.response.entity, originalQuestion: originalQuestion });
 
                 }
             }
@@ -362,48 +366,48 @@ function setupServer() {
     bot.dialog('FollowupQuestion',
         [
             (session, args) => {
-                if (args !== undefined) {
-                    let questionAsked = args.question;
+                if (args === undefined) {
+                    return session.replaceDialog('NotFound');
+                }
 
-                    //Handle users selecting to change context for a followup question. 
-                    if (args.context !== undefined) {
-                        session.privateConversationData.selectedContext = args.context;
-                    }
+                let questionAsked = args.question;
 
-                    let context = qna.QnAContext.fromState(session.privateConversationData.selectedContext);
+                //Handle users selecting to change context for a followup question. 
+                if (args.context !== undefined) {
+                    session.privateConversationData.selectedContext = args.context;
+                }
 
-                    // Score using the highest matching context
-                    context.scoreQuestion(questionAsked).then(
-                        res => {
-                            let topResult = res[0];
-                            if (topResult.score > config.qnaConfidencePrompt) {
-                                //If the user has selected a question manually, use this data to train QnAMaker
-                                if (args.originalQuestion !== undefined) {
-                                    context.trainResponse(args.originalQuestion, questionAsked, topResult.entity, session.message.user.id).catch(x => console.error('Error training model: ' + x));
-                                }
+                let context = qna.QnAContext.fromState(session.privateConversationData.selectedContext);
 
-                                builder.Prompts.text(session, buildResponseMessage(session, topResult));
-                            } else {
-                                session.replaceDialog('FollowupQuestionLowConfidence', questionAsked);
+                // Score using the highest matching context
+                context.scoreQuestion(questionAsked).then(
+                    res => {
+                        let topResult = res[0];
+                        if (topResult.score > config.qnaConfidencePrompt) {
+                            //If the user has selected a question manually, use this data to train QnAMaker
+                            if (args.originalQuestion !== undefined) {
+                                context.trainResponse(args.originalQuestion, questionAsked, topResult.entity, session.message.user.id).catch(x => console.error('Error training model: ' + x));
                             }
-                        },
-                        err => {
-                            session.send("Sorry I had a problem finding an answer to that question");
-                            console.error(err);
+
+                            builder.Prompts.text(session, buildResponseMessage(session, topResult));
+                        } else {
+                            return session.replaceDialog('FollowupQuestionLowConfidence', questionAsked);
                         }
-                    )
-                }
-                else {
-                    session.replaceDialog('NotFound');
-                }
+                    },
+                    err => {
+                        session.send("Sorry I had a problem finding an answer to that question");
+                        console.error(err);
+                    }
+                )
+
             },
             (session, result, args) => {
                 //Todo: Fixup temp workaround
                 if (result.response === 'action?not found') {
-                    session.replaceDialog('NotFound');
+                    return session.replaceDialog('NotFound');
                 } else {
                     session.privateConversationData.lastQuestion = result.response;
-                    session.replaceDialog('FollowupQuestion', { question: result.response });
+                    return session.replaceDialog('FollowupQuestion', { question: result.response });
                 }
             }
         ]
@@ -446,7 +450,7 @@ function setupServer() {
                         res => {
                             let topResult = res[0];
                             if (topResult === undefined || topResult.score === 0) {
-                                session.replaceDialog('NotFound', args);
+                                return session.replaceDialog('NotFound', args);
                             } else {
                                 let attachments = [new builder.HeroCard(session)
                                     .text(`We've found some answers but we're not sure if they're a good fit, you may have changed topics. We included what you can ask in @${currentContext.name}, as well as some alternatives`)];
@@ -516,16 +520,16 @@ function setupServer() {
                     originalQuestion = session.privateConversationData.lastQuestion;
                 } else {
                     session.privateConversationData.lastQuestion = question;
-                    session.replaceDialog('FollowupQuestion', { question: question, context: context, originalQuestion: originalQuestion });
+                    return session.replaceDialog('FollowupQuestion', { question: question, context: context, originalQuestion: originalQuestion });
                 }
 
 
             } else {
                 if (result.response === 'action?not found') {
-                    session.replaceDialog('NotFound');
+                    return session.replaceDialog('NotFound');
                 }
                 session.privateConversationData.lastQuestion = result.response;
-                session.replaceDialog('FollowupQuestion', { question: result.response });
+                return session.replaceDialog('FollowupQuestion', { question: result.response });
             }
         } */
     ])

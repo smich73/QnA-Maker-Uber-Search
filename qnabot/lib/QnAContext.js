@@ -19,7 +19,7 @@ class QnAContext {
     }
 
     static fromState(contextState) {
-        return new QnAContext(contextState._qnaMakerKey, contextState.id, contextState.name, contextState.docId, contextState.kbid, contextState.similarContexts, contextState.possibleQuestions);
+        return new QnAContext(contextState._qnaMakerKey, contextState.id, contextState.name, contextState.docId, contextState.kbid, contextState.score, contextState.similarContexts, contextState.possibleQuestions);
     }
 
     scoreQuestion(question) {
