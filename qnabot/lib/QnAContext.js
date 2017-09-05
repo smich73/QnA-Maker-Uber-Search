@@ -7,7 +7,8 @@ const entities = require("html-entities");
 const htmlentities = new entities.AllHtmlEntities();
 
 class QnAContext {
-    constructor(qnaMakerKey, name, docId, kbid, score, similarContexts, possibleQuestions) {
+    constructor(qnaMakerKey, id, name, docId, kbid, score, similarContexts, possibleQuestions) {
+        this.id = id;
         this.name = name;
         this.docId = docId;
         this.kbid = kbid;
@@ -18,7 +19,7 @@ class QnAContext {
     }
 
     static fromState(contextState) {
-        return new QnAContext(contextState._qnaMakerKey, contextState.name, contextState.docId, contextState.kbid, contextState.similarContexts, contextState.possibleQuestions);
+        return new QnAContext(contextState._qnaMakerKey, contextState.id, contextState.name, contextState.docId, contextState.kbid, contextState.similarContexts, contextState.possibleQuestions);
     }
 
     scoreQuestion(question) {
@@ -75,6 +76,41 @@ class QnAContext {
                 catch (e) {
                     reject(e);
                 }
+            })
+        })
+    }
+
+    trainResponse(questionAsked, questionSelected, answerShown, userId) {
+
+        return new Promise((resolve, reject) => {
+            let postObject = {
+                feedbackRecords: [
+                    {
+                        userId: userId,
+                        userQuestion: questionAsked,
+                        kbQuestion: questionSelected,
+                        kbAnswer: answerShown
+                    }
+                ]
+            }
+
+            var postBody = JSON.stringify(postObject);
+            request({
+                url: 'https://westus.api.cognitive.microsoft.com/qnamaker/v2.0/knowledgebases/' + this.kbid + '/train',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Ocp-Apim-Subscription-Key': this._qnaMakerKey
+                },
+                body: postBody
+            }, (error, response, body) => {
+                let isSuccessful = !error && response.statusCode === 204;
+                if (isSuccessful){
+                    resolve();
+                } else {
+                    reject(JSON.parse(body));
+                }
+
             })
         })
     }

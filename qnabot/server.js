@@ -91,7 +91,7 @@ function buildResponseMessage(session, response) {
 
     if (response.score < config.answerUncertainWarning) {
         attachment = attachment.buttons([
-            builder.CardAction.dialogAction(session, 'FollowupQuestionLowConfidence', null, 'Not the right answer? Click here')
+            builder.CardAction.dialogAction(session, 'NotFound', null, 'Not the right question? Click here to see others')
         ])
     }
 
@@ -104,10 +104,10 @@ function buildResponseMessage(session, response) {
 }
 
 function decodeASCII(str) {
-    return str.replace( /&#([0-9]{1,7});/g, function( g, m1 ){
-    return String.fromCharCode( parseInt( m1, 10 ) );
-    }).replace( /&#[xX]([0-9a-fA-F]{1,6});/g, function( g, m1 ){
-    return String.fromCharCode( parseInt( m1, 16 ) );
+    return str.replace(/&#([0-9]{1,7});/g, function (g, m1) {
+        return String.fromCharCode(parseInt(m1, 10));
+    }).replace(/&#[xX]([0-9a-fA-F]{1,6});/g, function (g, m1) {
+        return String.fromCharCode(parseInt(m1, 16));
     });
 }
 
@@ -121,7 +121,7 @@ function setupServer() {
             spellcheck.spellcheckMessage(session, next).then(
                 res => {
                     let result = res;
-                    if (result !== undefined){
+                    if (result !== undefined) {
                         session.message.text = result.corrected;
                         console.log('Original:', result.original, 'Corrected:', result.corrected);
                     }
@@ -243,14 +243,15 @@ function setupServer() {
             },
             (session, result, args) => {
                 // User didn't find a question that was right 
-                
+
                 if (result.response.index > session.privateConversationData.selectedContext.possibleQuestions.length - 1) {
                     session.privateConversationData.selectedContext = null;
                     session.replaceDialog('NotFound');
 
                 } else {
+                    let originalQuestion = session.privateConversationData.lastQuestion;
                     session.privateConversationData.lastQuestion = result.response.entity;
-                    session.replaceDialog('FollowupQuestion', { question: result.response.entity });
+                    session.replaceDialog('FollowupQuestion', { question: result.response.entity, originalQuestion: originalQuestion });
 
                 }
             }
@@ -261,7 +262,7 @@ function setupServer() {
     bot.dialog('FollowupQuestion',
         [
             (session, args) => {
-                if (args !== undefined){
+                if (args !== undefined) {
                     let questionAsked = args.question;
 
                     //Handle users selecting to change context for a followup question. 
@@ -269,12 +270,18 @@ function setupServer() {
                         session.privateConversationData.selectedContext = args.context;
                     }
 
-                    // Score using the highest matching context
                     let context = qna.QnAContext.fromState(session.privateConversationData.selectedContext);
+
+                    // Score using the highest matching context
                     context.scoreQuestion(questionAsked).then(
                         res => {
                             let topResult = res[0];
                             if (topResult.score > config.qnaConfidencePrompt) {
+                                //If the user has selected a question manually, use this data to train QnAMaker
+                                if (args.originalQuestion !== undefined) {
+                                    context.trainResponse(args.originalQuestion, questionAsked, topResult.entity, session.message.user.id).catch(x => console.error('Error training model: ' + x));
+                                }
+
                                 builder.Prompts.text(session, buildResponseMessage(session, topResult));
                             } else {
                                 session.replaceDialog('FollowupQuestionLowConfidence', questionAsked);
@@ -291,8 +298,13 @@ function setupServer() {
                 }
             },
             (session, result, args) => {
-                session.privateConversationData.lastQuestion = result.response;
-                session.replaceDialog('FollowupQuestion', { question: result.response });
+                //Todo: Fixup temp workaround
+                if (result.response === 'action?not found') {
+                    session.replaceDialog('NotFound');
+                } else {
+                    session.privateConversationData.lastQuestion = result.response;
+                    session.replaceDialog('FollowupQuestion', { question: result.response });
+                }
             }
         ]
     );
@@ -320,7 +332,7 @@ function setupServer() {
                     //Add in the existing contexts that are being tracked. 
                     let contexts = session.privateConversationData.questionContexts.map(x => qna.QnAContext.fromState(x));
                     if (res !== undefined && res.length > 1) {
-                            contexts.push(...res);
+                        contexts.push(...res);
                     }
 
                     //TOBO: Does this steadily bloat the contexts over a chat? Yes
@@ -335,25 +347,21 @@ function setupServer() {
                             if (topResult === undefined) {
                                 session.replaceDialog('NotFound', args);
                             } else {
-                                let answersFromCurrentContext = utils.top(res.filter(x=>x.score > config.qnaMinConfidence && x.docId === currentContext.docId), 3);
+                                let answersFromCurrentContext = utils.top(res.filter(x => x.score > config.qnaMinConfidence && x.docId === currentContext.docId), 3);
 
-                                let answersFromOtherContexts = utils.top(res.filter(x=>x.score > config.qnaMinConfidence && x.docId !== currentContext.docId), 3);
+                                let answersFromOtherContexts = utils.top(res.filter(x => x.score > config.qnaMinConfidence && x.docId !== currentContext.docId), 3);
                                 let attachments = [new builder.HeroCard(session)
-<<<<<<< HEAD
-                                .text(`We've found some answers but we're not sure if they're a good fit, you may have changed topics`)];
-=======
-                                .text(`We've found some answers but we're not sure if they're a good fit, you may have changed topics. We included what you can ask in @${currentContext.name}, as well as some alternatives`)];
->>>>>>> 78394419a4773fc1aae040937a7ae26ea10c1fb6
-                                
+                                    .text(`We've found some answers but we're not sure if they're a good fit, you may have changed topics. We included what you can ask in @${currentContext.name}, as well as some alternatives`)];
+
                                 //If none of these answers are from the current context
                                 // offer the user the option to see what he can ask in that context
-                                if (answersFromCurrentContext.length < 1){
+                                if (answersFromCurrentContext.length < 1) {
                                     attachments.push(
                                         new builder.HeroCard(session)
-                                        .title("@" + currentContext.name)
-                                        .subtitle("No answers found for this area")
-                                        .buttons([
-                                        builder.CardAction.dialogAction(session, "NotFound", null, "What can I ask?")])
+                                            .title("@" + currentContext.name)
+                                            .subtitle("No answers found for this area")
+                                            .buttons([
+                                                builder.CardAction.dialogAction(session, "NotFound", null, "What can I ask?")])
                                     );
                                 } else {
                                     attachments.push(...answersFromCurrentContext.map(x => {
@@ -361,11 +369,11 @@ function setupServer() {
                                             .title(x.questionMatched)
                                             .subtitle("@" + x.name)
                                             .buttons([
-                                                builder.CardAction.imBack(session, `@${x.name}: ${x.questionMatched}`, `Ask this`)
+                                                builder.CardAction.imBack(session, `@${x.name}: ${decodeASCII(x.questionMatched)}`, `Ask this`)
                                             ])
                                     }));
                                 }
-                                
+
                                 attachments.push(...answersFromOtherContexts.map(x => {
                                     return new builder.HeroCard(session)
                                         .title(x.questionMatched)
@@ -405,7 +413,15 @@ function setupServer() {
                 let question = text.substring(indexOfSeperator + 1);
                 let context = session.privateConversationData.questionContexts.filter(x => x.name === contextName)[0];
 
-                session.replaceDialog('FollowupQuestion', { question: question, context: context });
+                let originalQuestion;
+                if (context.id === session.privateConversationData.selectedContext.id) {
+                    //Add the necessary data to train the qna model. 
+                    originalQuestion = session.privateConversationData.lastQuestion;
+                } else {
+                    session.privateConversationData.lastQuestion = question;
+                    session.replaceDialog('FollowupQuestion', { question: question, context: context, originalQuestion: originalQuestion });
+                }
+
 
             } else {
                 session.privateConversationData.lastQuestion = result.response;

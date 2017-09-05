@@ -291,3 +291,4 @@ __pycache__/
 /.vscode/tags
 
 python/data/
+.env.search

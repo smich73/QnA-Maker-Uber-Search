@@ -15,7 +15,7 @@ class AggregateClient {
 
     _lookupQna(item) {
         return new Promise((resolve) => {
-            let query = new azureStorage.TableQuery().top(1).where('RowKey eq ?', item.name);
+            let query = new azureStorage.TableQuery().top(1).where('RowKey eq ?', item.id);
             this._tableClient.queryEntities(this._tableClient.lookupTableName, query, null, (err, res) => {
                 if (err) {
                     console.error(err);
@@ -26,11 +26,12 @@ class AggregateClient {
                     let kbId = res.entries[0].KBID._;
                     let context = new qna.QnAContext(
                         this._qnaMakerKey,
+                        item.id,
                         item.name,
                         item.source,
                         kbId,
                         item["@search.score"],
-                        null, //TODO: Add in similar contexts here!
+                        JSON.parse(item.related), //TODO: Add in similar contexts here!
                         JSON.parse(item.questions)
                     );
 

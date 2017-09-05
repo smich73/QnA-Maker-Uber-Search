@@ -30,10 +30,12 @@ function setupSearch() {
         let index = {
             name: config.indexName,
             fields: [
-                { name: "source", type: "Edm.String", key: true},
+                { name: "id", type: "Edm.String", key: true},
+                { name: "source", type: "Edm.String"},
                 { name: "name", type: "Edm.String" },
                 { name: "keywords", type: "Edm.String", sortable: false },
                 { name: "questions", type: "Edm.String", sortable: false },
+                { name: "related", type: "Edm.String", sortable: false, searchable: false },
 
             ]
         }
@@ -65,7 +67,9 @@ function createIndexer() {
         },
         fieldMappings: [
             { sourceFieldName: "/name", targetFieldName: "name" },
+            { sourceFieldName: "/id", targetFieldName: "id" },
             { sourceFieldName: "/metadata/keywords", targetFieldName: "keywords" },
+            { sourceFieldName: "/related", targetFieldName: "related" },
             { sourceFieldName: "/allquestions", targetFieldName: "questions" }
         ]
     }
@@ -79,5 +83,6 @@ function createIndexer() {
     }) 
 }
 
-//setupSearch()
-createIndexer()
+setupSearch()
+
+//createIndexer();
