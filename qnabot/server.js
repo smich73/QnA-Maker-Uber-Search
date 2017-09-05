@@ -1,5 +1,6 @@
 const restify = require('restify');
 const builder = require('botbuilder');
+const lodash = require('lodash');
 const azureStorage = require('azure-storage');
 const search = require('azure-search-client');
 const ag = require('./lib/AggregateClient');
@@ -102,22 +103,37 @@ function buildResponseMessage(session, response) {
     return msg;
 }
 
+function decodeASCII(str) {
+    return str.replace( /&#([0-9]{1,7});/g, function( g, m1 ){
+    return String.fromCharCode( parseInt( m1, 10 ) );
+    }).replace( /&#[xX]([0-9a-fA-F]{1,6});/g, function( g, m1 ){
+    return String.fromCharCode( parseInt( m1, 16 ) );
+    });
+}
 
 function setupServer() {
     server.post('/api/messages', chatConnector.listen());
     var bot = new builder.UniversalBot(chatConnector);
+
     // Set up interceptor on all incoming messages (user -> Bot) for spellcheck
     bot.use({
         botbuilder: function (session, next) {
             spellcheck.spellcheckMessage(session, next).then(
                 res => {
-                    let result = res.corrected;
-                    session.message.text = result;
-                    console.log("spellchecked" + result);
+                    let result = res;
+                    if (result !== undefined){
+                        session.message.text = result.corrected;
+                        console.log('Original:', result.original, 'Corrected:', result.corrected);
+                    }
+                    else {
+                        session.message.text = result.original;
+                        console.log('ERROR SPELLCHECKING:', result.original);
+                    }
                     next();
                 });
         }
     });
+
     bot.beginDialogAction('FollowupQuestionLowConfidence', 'FollowupQuestionLowConfidence');
     bot.beginDialogAction('FollowupQuestion', 'FollowupQuestion');
     bot.beginDialogAction('NotFound', 'NotFound');
@@ -140,13 +156,13 @@ function setupServer() {
                 agClient.searchAndScore(questionAsked).then(
                     res => {
                         if (res.length < 1 || res.score === 0 || res.score < config.qnaMinConfidence) {
-                            //TODO: In low confidence scenario office available contexts for user to pick. 
+                            //TODO: In low confidence scenario offer available contexts for user to pick. 
                             session.replaceDialog('NotFound', null);
                         } else {
                             session.privateConversationData.questionContexts = res.contexts;
 
                             //Todo: Should this be moved into the aggregate client? 
-                            // I think potentially this sits better as part of it's concerns. 
+                            // I think potentially this sits better as part of its concerns. 
                             let options = [];
                             let scoreToBeat = res.contexts[0].score - config.choiceConfidenceDelta;
                             res.contexts.forEach(currentContext => {
@@ -164,7 +180,7 @@ function setupServer() {
                         }
                     },
                     err => {
-                        session.send('Sorry I had a problem finding an answer to that question');
+                        session.send('Sorry, I had a problem finding an answer to that question');
                         console.error(err);
                     }
                 );
@@ -245,29 +261,34 @@ function setupServer() {
     bot.dialog('FollowupQuestion',
         [
             (session, args) => {
-                let questionAsked = args.question;
+                if (args !== undefined){
+                    let questionAsked = args.question;
 
-                //Handle users selecting to change context for a followup question. 
-                if (args.context !== undefined) {
-                    session.privateConversationData.selectedContext = args.context;
-                }
-
-                // Score using the highest matching context
-                let context = qna.QnAContext.fromState(session.privateConversationData.selectedContext);
-                context.scoreQuestion(questionAsked).then(
-                    res => {
-                        let topResult = res[0];
-                        if (topResult.score > config.qnaConfidencePrompt) {
-                            builder.Prompts.text(session, buildResponseMessage(session, topResult));
-                        } else {
-                            session.replaceDialog('FollowupQuestionLowConfidence', questionAsked);
-                        }
-                    },
-                    err => {
-                        session.send("Sorry I had a problem finding an answer to that question");
-                        console.error(err);
+                    //Handle users selecting to change context for a followup question. 
+                    if (args.context !== undefined) {
+                        session.privateConversationData.selectedContext = args.context;
                     }
-                )
+
+                    // Score using the highest matching context
+                    let context = qna.QnAContext.fromState(session.privateConversationData.selectedContext);
+                    context.scoreQuestion(questionAsked).then(
+                        res => {
+                            let topResult = res[0];
+                            if (topResult.score > config.qnaConfidencePrompt) {
+                                builder.Prompts.text(session, buildResponseMessage(session, topResult));
+                            } else {
+                                session.replaceDialog('FollowupQuestionLowConfidence', questionAsked);
+                            }
+                        },
+                        err => {
+                            session.send("Sorry I had a problem finding an answer to that question");
+                            console.error(err);
+                        }
+                    )
+                }
+                else {
+                    session.replaceDialog('NotFound');
+                }
             },
             (session, result, args) => {
                 session.privateConversationData.lastQuestion = result.response;
@@ -299,7 +320,7 @@ function setupServer() {
                     //Add in the existing contexts that are being tracked. 
                     let contexts = session.privateConversationData.questionContexts.map(x => qna.QnAContext.fromState(x));
                     if (res !== undefined && res.length > 1) {
-                        contexts.push(...res);
+                            contexts.push(...res);
                     }
 
                     //TOBO: Does this steadily bloat the contexts over a chat? Yes
@@ -318,7 +339,11 @@ function setupServer() {
 
                                 let answersFromOtherContexts = utils.top(res.filter(x=>x.score > config.qnaMinConfidence && x.docId !== currentContext.docId), 3);
                                 let attachments = [new builder.HeroCard(session)
+<<<<<<< HEAD
                                 .text(`We've found some answers but we're not sure if they're a good fit, you may have changed topics`)];
+=======
+                                .text(`We've found some answers but we're not sure if they're a good fit, you may have changed topics. We included what you can ask in @${currentContext.name}, as well as some alternatives`)];
+>>>>>>> 78394419a4773fc1aae040937a7ae26ea10c1fb6
                                 
                                 //If none of these answers are from the current context
                                 // offer the user the option to see what he can ask in that context
@@ -344,9 +369,9 @@ function setupServer() {
                                 attachments.push(...answersFromOtherContexts.map(x => {
                                     return new builder.HeroCard(session)
                                         .title(x.questionMatched)
-                                        .subtitle("@" + x.name)
+                                        .subtitle("@" + x.name + ": " + x.questionMatched)
                                         .buttons([
-                                            builder.CardAction.imBack(session, `@${x.name}: ${x.questionMatched}`, `Ask this`)
+                                            builder.CardAction.imBack(session, `@${x.name}: ${decodeASCII(x.questionMatched)}`, `Ask this`)
                                         ])
                                 }));
 

@@ -4,8 +4,12 @@
   "description": "QnA Maker Uber Search project",
   "main": "qnagenerator.js",
   "dependencies": {
+    "azure-search-client": "^1.1.8",
     "azure-storage": "^2.3.0",
-    "request": "^2.81.0"
+    "botbuilder": "^3.9.1",
+    "html-entities": "^1.2.1",
+    "request": "^2.81.0",
+    "restify": "^5.2.0"
   },
   "devDependencies": {},
   "scripts": {
