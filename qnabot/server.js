@@ -167,14 +167,14 @@ function setupServer() {
             session.replaceDialog('FollowupQuestion', { question: result.response });
         }
     ])
-    .triggerAction({
-        matches: /^help$/i,
-        onSelectAction: (session, args, next) => {
-            // Add the help dialog to the dialog stack 
-            // (override the default behavior of replacing the stack)
-            session.beginDialog(args.action);
-        }
-    });
+        .triggerAction({
+            matches: /^help$/i,
+            onSelectAction: (session, args, next) => {
+                // Add the help dialog to the dialog stack 
+                // (override the default behavior of replacing the stack)
+                session.beginDialog(args.action);
+            }
+        });
 
     bot.dialog('Questions', [
         (session, args) => {
@@ -205,14 +205,14 @@ function setupServer() {
             }
         }
     ])
-    .triggerAction({
-        matches: /^questions$/i,
-        onSelectAction: (session, args, next) => {
-            // Add the help dialog to the dialog stack 
-            // (override the default behavior of replacing the stack)
-            session.beginDialog(args.action, args);
-        }
-    });
+        .triggerAction({
+            matches: /^questions$/i,
+            onSelectAction: (session, args, next) => {
+                // Add the help dialog to the dialog stack 
+                // (override the default behavior of replacing the stack)
+                session.beginDialog(args.action, args);
+            }
+        });
 
     bot.dialog('TopLevelQuestion',
         [
@@ -431,57 +431,54 @@ function setupServer() {
 
                     //Add in the existing contexts that are being tracked. 
                     let contexts = session.privateConversationData.questionContexts.map(x => qna.QnAContext.fromState(x));
+                    //Add in new contexts which matched at the top level.
                     if (res !== undefined && res.length > 1) {
                         contexts.push(...res);
                     }
 
+                    //Deduplicate contexts based on kbid.
+                    let keySet = new Map(contexts.map(x => [x.id, x]));
+                    contexts = Array.from(keySet.values());
                     //TOBO: Does this steadily bloat the contexts over a chat? Yes
-                    // What should we do?
                     session.privateConversationData.questionContexts = contexts;
-
-                    //TODO: Deduplicate contexts based on kbid. 
 
                     agClient.scoreRelevantAnswers(contexts, questionAsked).then(
                         res => {
                             let topResult = res[0];
-                            if (topResult === undefined) {
+                            if (topResult === undefined || topResult.score === 0) {
                                 session.replaceDialog('NotFound', args);
                             } else {
-                                let answersFromCurrentContext = utils.top(res.filter(x => x.score > config.qnaMinConfidence && x.docId === currentContext.docId), 3);
-
-                                let answersFromOtherContexts = utils.top(res.filter(x => x.score > config.qnaMinConfidence && x.docId !== currentContext.docId), 3);
                                 let attachments = [new builder.HeroCard(session)
                                     .text(`We've found some answers but we're not sure if they're a good fit, you may have changed topics. We included what you can ask in @${currentContext.name}, as well as some alternatives`)];
+
+                                let cardsToCreate = []
+                                let answersFromOtherContexts = utils.top(res.filter(x => x.score > config.qnaMinConfidence && x.context.id !== currentContext.id), 3);
+                                cardsToCreate.push(answersFromOtherContexts);
+
+                                let answersFromCurrentContext = utils.top(res.filter(x => x.score > config.qnaMinConfidence && x.context.id === currentContext.id), 3);
 
                                 //If none of these answers are from the current context
                                 // offer the user the option to see what he can ask in that context
                                 if (answersFromCurrentContext.length < 1) {
                                     attachments.push(
                                         new builder.HeroCard(session)
-                                            .title("@" + currentContext.name)
-                                            .subtitle("No answers found for this area")
+                                            .subtitle("@" + currentContext.name + ": No answers found for this area")
                                             .buttons([
                                                 builder.CardAction.dialogAction(session, "NotFound", null, "What can I ask?")])
                                     );
                                 } else {
-                                    attachments.push(...answersFromCurrentContext.map(x => {
-                                        return new builder.HeroCard(session)
-                                            .title(x.questionMatched)
-                                            .subtitle("@" + x.name)
-                                            .buttons([
-                                                builder.CardAction.imBack(session, `@${x.name}: ${utils.decodeASCII(x.questionMatched)}`, `Ask this`)
-                                            ])
-                                    }));
+                                    cardsToCreate.push(...answersFromCurrentContext);
                                 }
 
-                                attachments.push(...answersFromOtherContexts.map(x => {
+                                //Add all the cards to the attachments
+                                attachments.push(...cardsToCreate.map(x => {
                                     return new builder.HeroCard(session)
-                                        .title(x.questionMatched)
                                         .subtitle("@" + x.name + ": " + x.questionMatched)
                                         .buttons([
                                             builder.CardAction.imBack(session, `@${x.name}: ${utils.decodeASCII(x.questionMatched)}`, `Ask this`)
                                         ])
                                 }));
+
 
                                 var msg = new builder.Message(session);
                                 msg.attachmentLayout(builder.AttachmentLayout.list)
@@ -524,6 +521,9 @@ function setupServer() {
 
 
             } else {
+                if (result.response === 'action?not found') {
+                    session.replaceDialog('NotFound');
+                }
                 session.privateConversationData.lastQuestion = result.response;
                 session.replaceDialog('FollowupQuestion', { question: result.response });
             }

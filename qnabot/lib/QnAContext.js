@@ -105,7 +105,7 @@ class QnAContext {
                 body: postBody
             }, (error, response, body) => {
                 let isSuccessful = !error && response.statusCode === 204;
-                if (isSuccessful){
+                if (isSuccessful) {
                     resolve();
                 } else {
                     reject(JSON.parse(body));
