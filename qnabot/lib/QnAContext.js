@@ -97,7 +97,7 @@ class QnAContext {
             var postBody = JSON.stringify(postObject);
             request({
                 url: 'https://westus.api.cognitive.microsoft.com/qnamaker/v2.0/knowledgebases/' + this.kbid + '/train',
-                method: 'POST',
+                method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
                     'Ocp-Apim-Subscription-Key': this._qnaMakerKey
