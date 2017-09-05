@@ -212,6 +212,14 @@ function setupServer() {
                 // (override the default behavior of replacing the stack)
                 session.beginDialog(args.action, args);
             }
+        })
+        .triggerAction({
+            matches: /^tell me more.*$/i,
+            onSelectAction: (session, args, next) => {
+                // Add the help dialog to the dialog stack 
+                // (override the default behavior of replacing the stack)
+                session.beginDialog(args.action, args);
+            }
         });
 
     bot.dialog('TopLevelQuestion',
