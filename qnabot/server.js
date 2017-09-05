@@ -91,7 +91,7 @@ function buildResponseMessage(session, response) {
 
     if (response.score < config.answerUncertainWarning) {
         attachment = attachment.buttons([
-            builder.CardAction.dialogAction(session, 'NotFound', null, 'Not the right question? Click here to see others')
+            builder.CardAction.dialogAction(session, 'NotFound', null, 'Wrong question? Click here for options')
         ])
     }
 
@@ -103,17 +103,19 @@ function buildResponseMessage(session, response) {
     return msg;
 }
 
-function decodeASCII(str) {
-    return str.replace(/&#([0-9]{1,7});/g, function (g, m1) {
-        return String.fromCharCode(parseInt(m1, 10));
-    }).replace(/&#[xX]([0-9a-fA-F]{1,6});/g, function (g, m1) {
-        return String.fromCharCode(parseInt(m1, 16));
-    });
-}
-
 function setupServer() {
     server.post('/api/messages', chatConnector.listen());
-    var bot = new builder.UniversalBot(chatConnector);
+    var bot = new builder.UniversalBot(chatConnector, [
+        (session, args) => {
+            builder.Prompts.text(session, 'Welcome to QnA bot, you can ask questions and I\'ll look up relevant information for you.\
+            \n\nYou can find out what questions are available in your current conversation topic by typing \'questions\' at any time.\n\nYou can switch context at any time by\
+             typing \'@\' followed by the name of the condition you are interested in, for example \'@Toothache\' will allow you to ask\
+              questions about toothache if there is a match found for the condition in my records. Type \'help\' at any time to display this message again.');
+        },
+        (session, results, args) => {
+            session.replaceDialog('TopLevelQuestion', results.response);
+        }
+    ]);
 
     // Set up interceptor on all incoming messages (user -> Bot) for spellcheck
     bot.use({
@@ -138,15 +140,63 @@ function setupServer() {
     bot.beginDialogAction('FollowupQuestion', 'FollowupQuestion');
     bot.beginDialogAction('NotFound', 'NotFound');
 
-    bot.dialog('/',
-        [
-            (session, args) => {
-                builder.Prompts.text(session, 'Welcome to QnA bot, you can ask questions and I\'ll look up relevant information for you.');
-            },
-            (session, results, args) => {
-                session.replaceDialog('TopLevelQuestion', results.response);
+    bot.dialog('Help', [
+        (session, args, next) => {
+            builder.Prompts.text(session, 'I\'m QnA bot, you can ask questions and I\'ll look up relevant information for you.\
+            \n\nYou can find out what questions are available by typing \'questions\' at any time.\n\nYou can switch context at any time by\
+            typing \'@\' followed by the name of the condition you are interested in, for example \'@Toothache\' will allow you to ask\
+            questions about toothache if there is a match found for the condition in my records. Type \'help\' at any time to display this message again.');
+        },
+        (session, result, args) => {
+            session.replaceDialog('FollowupQuestion', { question: result.response });
+        }
+    ])
+    .triggerAction({
+        matches: /^help$/i,
+        onSelectAction: (session, args, next) => {
+            // Add the help dialog to the dialog stack 
+            // (override the default behavior of replacing the stack)
+            session.beginDialog(args.action);
+        }
+    });
+
+    bot.dialog('Questions', [
+        (session, args) => {
+            if (session.privateConversationData.selectedContext) {
+                let options = session.privateConversationData.selectedContext.possibleQuestions.slice(0); //Take a copy otherwise changes get saved to state
+                options.push('None of these are useful');
+                builder.Prompts.choice(
+                    session,
+                    `I can provide answers to the following questions for @${session.privateConversationData.selectedContext.name}: `, options,
+                    { listStyle: builder.ListStyle.button });
+
+            } else {
+                session.replaceDialog('NotFound');
             }
-        ]);
+        },
+        (session, result, args) => {
+            // User didn't find a question that was right 
+
+            if (result.response.index > session.privateConversationData.selectedContext.possibleQuestions.length - 1) {
+                session.privateConversationData.selectedContext = null;
+                session.replaceDialog('NotFound');
+
+            } else {
+                let originalQuestion = session.privateConversationData.lastQuestion;
+                session.privateConversationData.lastQuestion = result.response.entity;
+                session.replaceDialog('FollowupQuestion', { question: result.response.entity, originalQuestion: originalQuestion });
+
+            }
+        }
+    ])
+    .triggerAction({
+        matches: /^questions$/i,
+        onSelectAction: (session, args, next) => {
+            // Add the help dialog to the dialog stack 
+            // (override the default behavior of replacing the stack)
+            session.beginDialog(args.action, args);
+        }
+    });
 
     bot.dialog('TopLevelQuestion',
         [
@@ -369,7 +419,7 @@ function setupServer() {
                                             .title(x.questionMatched)
                                             .subtitle("@" + x.name)
                                             .buttons([
-                                                builder.CardAction.imBack(session, `@${x.name}: ${decodeASCII(x.questionMatched)}`, `Ask this`)
+                                                builder.CardAction.imBack(session, `@${x.name}: ${utils.decodeASCII(x.questionMatched)}`, `Ask this`)
                                             ])
                                     }));
                                 }
@@ -379,7 +429,7 @@ function setupServer() {
                                         .title(x.questionMatched)
                                         .subtitle("@" + x.name + ": " + x.questionMatched)
                                         .buttons([
-                                            builder.CardAction.imBack(session, `@${x.name}: ${decodeASCII(x.questionMatched)}`, `Ask this`)
+                                            builder.CardAction.imBack(session, `@${x.name}: ${utils.decodeASCII(x.questionMatched)}`, `Ask this`)
                                         ])
                                 }));
 
