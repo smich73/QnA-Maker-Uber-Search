@@ -152,6 +152,7 @@ function setupServer() {
         [
             (session, args) => {
                 let questionAsked = args;
+
                 session.privateConversationData.lastQuestion = questionAsked;
                 agClient.searchAndScore(questionAsked).then(
                     res => {
@@ -424,6 +425,9 @@ function setupServer() {
 
 
             } else {
+                if (result.response === 'action?not found') {
+                    session.replaceDialog('NotFound');
+                }
                 session.privateConversationData.lastQuestion = result.response;
                 session.replaceDialog('FollowupQuestion', { question: result.response });
             }
