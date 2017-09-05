@@ -92,7 +92,7 @@ function buildResponseMessage(session, response) {
     if (response.score < config.answerUncertainWarning) {
         attachment = attachment.buttons([
             builder.CardAction.dialogAction(session, 'NotFound', null, 'Wrong question? Click here for options')
-        ])
+        ]);
     }
 
 
@@ -107,10 +107,14 @@ function setupServer() {
     server.post('/api/messages', chatConnector.listen());
     var bot = new builder.UniversalBot(chatConnector, [
         (session, args) => {
-            builder.Prompts.text(session, 'Welcome to QnA bot, you can ask questions and I\'ll look up relevant information for you.\
-            \n\nYou can find out what questions are available in your current conversation topic by typing \'questions\' at any time.\n\nYou can switch context at any time by\
-             typing \'@\' followed by the name of the condition you are interested in, for example \'@Toothache\' will allow you to ask\
-              questions about toothache if there is a match found for the condition in my records. Type \'help\' at any time to display this message again.');
+            builder.Prompts.text(session, `Welcome to QnA bot, you can ask questions and I\'ll look up relevant information for you.\
+
+            \n\nYou can find out what questions are available for your current conversation topic (once we\'ve started chatting) by typing \'questions\'.\
+
+            \n\nYou can switch context at any time by typing \'@\' followed by the name of the condition you are interested in, for example \'@Toothache\' will allow you to ask\
+            questions about toothache if there is a match found for the condition in my records.\
+
+            \n\nType \'help\' at any time to display this message again.`);
         },
         (session, results, args) => {
             session.replaceDialog('TopLevelQuestion', results.response);
@@ -121,18 +125,24 @@ function setupServer() {
     bot.use({
         botbuilder: function (session, next) {
             spellcheck.spellcheckMessage(session, next).then(
-                res => {
-                    let result = res;
-                    if (result !== undefined) {
-                        session.message.text = result.corrected;
-                        console.log('Original:', result.original, 'Corrected:', result.corrected);
+            res => {
+                let result = res;
+                if (result !== undefined) {
+                    session.message.text = result.corrected;
+                    console.log('Original:', result.original, 'Corrected:', result.corrected);
+                    if (session.privateConversationData.selectedContext !== undefined){
+                        console.log('Context:', session.privateConversationData.selectedContext.name);
                     }
                     else {
-                        session.message.text = result.original;
-                        console.log('ERROR SPELLCHECKING:', result.original);
+                        console.log('No context found');
                     }
-                    next();
-                });
+                }
+                else {
+                    session.message.text = result.original;
+                    console.log('ERROR SPELLCHECKING:', result.original);
+                }
+            });
+            next();
         }
     });
 
@@ -142,10 +152,22 @@ function setupServer() {
 
     bot.dialog('Help', [
         (session, args, next) => {
-            builder.Prompts.text(session, 'I\'m QnA bot, you can ask questions and I\'ll look up relevant information for you.\
-            \n\nYou can find out what questions are available by typing \'questions\' at any time.\n\nYou can switch context at any time by\
-            typing \'@\' followed by the name of the condition you are interested in, for example \'@Toothache\' will allow you to ask\
-            questions about toothache if there is a match found for the condition in my records. Type \'help\' at any time to display this message again.');
+            var contextDetails;
+            if (session.privateConversationData.selectedContext === undefined){
+                contextDetails = 'You don\'t currently have a context. Please ask a question about a medical condition to continue.';
+            }
+            else{
+                contextDetails = 'Your current context is: @' + session.privateConversationData.selectedContext.name;
+            }
+
+            builder.Prompts.text(session, `I\'m QnA bot, you can ask questions and I\'ll look up relevant information for you.\
+
+            \nYou can find out what questions are available for your current conversation topic by typing \'questions\' at any time.\
+
+            \nYou can switch context at any time by typing \'@\' followed by the name of the condition you are interested in, for example \'@Toothache\' will allow you to ask\
+            questions about toothache if there is a match found for the condition in my records. ${contextDetails}.\
+
+            \nType \'help\' at any time to display this message again.`);
         },
         (session, result, args) => {
             session.replaceDialog('FollowupQuestion', { question: result.response });
@@ -202,8 +224,24 @@ function setupServer() {
         [
             (session, args) => {
                 let questionAsked = args;
+<<<<<<< HEAD
+=======
+                if (questionAsked.charAt(0) === '@'){
+                    questionAsked = questionAsked.substring(1);
+                }
+                var questionSegments = questionAsked.split(':');
+
+                if (questionSegments.length > 1){
+                    if (questionSegments[1].charAt(0) === ' '){
+                        questionSegments[1] = questionSegments[1].substring(1).replace('?', '');
+                    }
+                    session.privateConversationData.lastQuestion = questionSegments[1];
+                    questionAsked = questionSegments[1] + ' of ' + questionSegments[0];
+                }
+>>>>>>> e1096c896ecf08361a3ec17624ebcaf5e65cb2dc
 
                 session.privateConversationData.lastQuestion = questionAsked;
+
                 agClient.searchAndScore(questionAsked).then(
                     res => {
                         if (res.length < 1 || res.score === 0 || res.score < config.qnaMinConfidence) {
@@ -240,12 +278,19 @@ function setupServer() {
                 session.privateConversationData.lastQuestion = result.response;
                 session.replaceDialog('FollowupQuestion', { question: result.response });
             }
-        ]
-    );
+        ])
+        .triggerAction({
+            matches: /\@.*$/i,
+            onSelectAction: (session, args, next) => {
+                // Add the help dialog to the dialog stack 
+                // (override the default behavior of replacing the stack)
+                session.beginDialog(args.action, session.message.text);
+            }
+        });
 
     bot.dialog('SelectContext', [
         (session, args) => {
-            let options = session.privateConversationData.questionContexts.map(x => '@' + x.name);
+            let options = session.privateConversationData.questionContexts.map(x => x.name);
             options.push('None of the above');
             builder.Prompts.choice(
                 session,

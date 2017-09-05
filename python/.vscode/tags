@@ -1,0 +1,79 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+Counter	../keywords.py	/^from collections import Counter$/;"	kind:namespace	line:4
+DATA_DIR	../preprocessor.py	/^DATA_DIR = os.environ["PDATA_DIR"]$/;"	kind:variable	line:25
+HTMLConverter	../pdf.py	/^from pdfminer.converter import XMLConverter, HTMLConverter, TextConverter$/;"	kind:namespace	line:6
+LAParams	../pdf.py	/^from pdfminer.layout import LAParams$/;"	kind:namespace	line:7
+NLP	../preprocessor.py	/^NLP = spacy.load('en')$/;"	kind:variable	line:27
+PDFPage	../pdf.py	/^from pdfminer.pdfpage import PDFPage$/;"	kind:namespace	line:8
+PDFPageInterpreter	../pdf.py	/^from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter$/;"	kind:namespace	line:4
+PDFResourceManager	../pdf.py	/^from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter$/;"	kind:namespace	line:4
+Pool	../preprocessor.py	/^from multiprocessing import Pool$/;"	kind:namespace	line:12
+QnaDoc	../models.py	/^class QnaDoc:$/;"	kind:class	line:7
+QnaDoc	../preprocessor.py	/^from models import QnaDoc, QnaPair$/;"	kind:namespace	line:23
+QnaPair	../models.py	/^class QnaPair:$/;"	kind:class	line:59
+QnaPair	../preprocessor.py	/^from models import QnaDoc, QnaPair$/;"	kind:namespace	line:23
+STOPWORD_URL	../preprocessor.py	/^STOPWORD_URL = "https:\/\/qnageneratorstorage.blob.core.windows.net\/stopwords\/customStopwords.txt"$/;"	kind:variable	line:26
+TagExtractor	../pdf.py	/^from pdfminer.pdfdevice import TagExtractor$/;"	kind:namespace	line:5
+TextConverter	../pdf.py	/^from pdfminer.converter import XMLConverter, HTMLConverter, TextConverter$/;"	kind:namespace	line:6
+XMLConverter	../pdf.py	/^from pdfminer.converter import XMLConverter, HTMLConverter, TextConverter$/;"	kind:namespace	line:6
+_QuestionMetaDataPair	../models.py	/^class _QuestionMetaDataPair:$/;"	kind:class	line:54
+_RelatedDoc	../models.py	/^class _RelatedDoc:$/;"	kind:class	line:46
+__init__	../models.py	/^    def __init__(self, docId, name, source, filename):$/;"	kind:member	line:11
+__init__	../models.py	/^    def __init__(self, key, value):$/;"	kind:member	line:55
+__init__	../models.py	/^    def __init__(self, qnadoc, count, commmonwords):$/;"	kind:member	line:47
+__init__	../models.py	/^    def __init__(self, question, source):$/;"	kind:member	line:62
+_enrich_qna	../preprocessor.py	/^def _enrich_qna(qnadoc):$/;"	kind:function	line:65
+_extract_questions	../preprocessor.py	/^def _extract_questions(row):$/;"	kind:function	line:87
+_find_similar	../preprocessor.py	/^def _find_similar(doclist, simans=None, simdoc=None):$/;"	kind:function	line:143
+_get_filename	../preprocessor.py	/^def _get_filename(row):$/;"	kind:function	line:29
+_get_item	../preprocessor.py	/^def _get_item(row):$/;"	kind:function	line:36
+_get_question_subject	../preprocessor.py	/^def _get_question_subject(question, doc_name):$/;"	kind:function	line:55
+_is_word	../keywords.py	/^def _is_word(nlp, word):$/;"	kind:function	line:7
+_matches_main_doc_subject	../preprocessor.py	/^def _matches_main_doc_subject(subject, doc_name):$/;"	kind:function	line:48
+add_answer_text	../models.py	/^    def add_answer_text(self, text):$/;"	kind:member	line:69
+add_answer_text	../preprocessor.py	/^    def add_answer_text(sent):$/;"	kind:function	line:110
+add_metadata	../models.py	/^    def add_metadata(self, key, value):$/;"	kind:member	line:36
+add_metadata	../models.py	/^    def add_metadata(self, key, value):$/;"	kind:member	line:74
+add_pair	../models.py	/^    def add_pair(self, pair):$/;"	kind:member	line:22
+add_related_doc	../models.py	/^    def add_related_doc(self, relatedqna, count, commmonwords):$/;"	kind:member	line:41
+compare	../preprocessor.py	/^import compare$/;"	kind:namespace	line:18
+compare.py	../compare.py	1;"	kind:file	line:1
+compare_doc_keywords	../compare.py	/^def compare_doc_keywords(qnadoc, otherdoc):$/;"	kind:function	line:33
+csv	../preprocessor.py	/^import csv$/;"	kind:namespace	line:7
+encode_qna_pair	../models.py	/^def encode_qna_pair(obj):$/;"	kind:function	line:80
+extract_keywords	../keywords.py	/^def extract_keywords(nlp, text, number_to_return):$/;"	kind:function	line:11
+extract_text	../pdf.py	/^def extract_text(filename):$/;"	kind:function	line:10
+finish_existing_question	../preprocessor.py	/^    def finish_existing_question(sent):$/;"	kind:function	line:103
+get	../preprocessor.py	/^from requests import get$/;"	kind:namespace	line:13
+is_question	../preprocessor.py	/^    def is_question(sent):$/;"	kind:function	line:89
+itertools	../preprocessor.py	/^import itertools$/;"	kind:namespace	line:15
+json	../models.py	/^import json$/;"	kind:namespace	line:3
+keywords	../preprocessor.py	/^import keywords$/;"	kind:namespace	line:21
+keywords.py	../keywords.py	1;"	kind:file	line:1
+models.py	../models.py	1;"	kind:file	line:1
+multiprocessing	../preprocessor.py	/^import multiprocessing$/;"	kind:namespace	line:11
+os	../pdf.py	/^import os$/;"	kind:namespace	line:3
+os	../preprocessor.py	/^import os$/;"	kind:namespace	line:8
+pdf	../preprocessor.py	/^import pdf$/;"	kind:namespace	line:19
+pdf.py	../pdf.py	1;"	kind:file	line:1
+populate_stopwords	../stopwords.py	/^def populate_stopwords(nlp, stopword_url):$/;"	kind:function	line:6
+preprocess_docs	../preprocessor.py	/^def preprocess_docs():$/;"	kind:function	line:158
+preprocessor.py	../preprocessor.py	1;"	kind:file	line:1
+re	../keywords.py	/^import re$/;"	kind:namespace	line:3
+re	../preprocessor.py	/^import re$/;"	kind:namespace	line:9
+request	../stopwords.py	/^import urllib.request$/;"	kind:namespace	line:3
+save_json	../models.py	/^    def save_json(self):$/;"	kind:member	line:28
+spacy	../keywords.py	/^import spacy$/;"	kind:namespace	line:5
+spacy	../preprocessor.py	/^import spacy$/;"	kind:namespace	line:14
+spacy	../stopwords.py	/^import spacy$/;"	kind:namespace	line:4
+start_new_question	../preprocessor.py	/^    def start_new_question(sent):$/;"	kind:function	line:96
+stopwords	../preprocessor.py	/^import stopwords$/;"	kind:namespace	line:20
+stopwords.py	../stopwords.py	1;"	kind:file	line:1
+sys	../preprocessor.py	/^import sys$/;"	kind:namespace	line:6
+time	../preprocessor.py	/^import time$/;"	kind:namespace	line:10
+urllib	../stopwords.py	/^import urllib.request$/;"	kind:namespace	line:3
