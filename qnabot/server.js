@@ -224,8 +224,6 @@ function setupServer() {
         [
             (session, args) => {
                 let questionAsked = args;
-<<<<<<< HEAD
-=======
                 if (questionAsked.charAt(0) === '@'){
                     questionAsked = questionAsked.substring(1);
                 }
@@ -238,7 +236,6 @@ function setupServer() {
                     session.privateConversationData.lastQuestion = questionSegments[1];
                     questionAsked = questionSegments[1] + ' of ' + questionSegments[0];
                 }
->>>>>>> e1096c896ecf08361a3ec17624ebcaf5e65cb2dc
 
                 session.privateConversationData.lastQuestion = questionAsked;
 
