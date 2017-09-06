@@ -70,6 +70,7 @@ class QnAContext {
                         resolve(answerEntities);
                     }
                     else {
+                        console.error(JSON.parse(body));
                         reject(JSON.parse(body));
                     }
                 }

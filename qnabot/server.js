@@ -461,11 +461,11 @@ function setupServer() {
                                 return session.replaceDialog('NotFound', args);
                             } else {
                                 let attachments = [new builder.HeroCard(session)
-                                    .text(`We've found some answers but we're not sure if they're a good fit, you may have changed topics. We included what you can ask in @${currentContext.name}, as well as some alternatives`)];
+                                    .text(`We've found some answers but we're not sure if they're a good fit, you may have changed topics.`)];
 
                                 let cardsToCreate = []
                                 let answersFromOtherContexts = utils.top(res.filter(x => x.score > config.qnaMinConfidence && x.context.id !== currentContext.id), 3);
-                                cardsToCreate.push(answersFromOtherContexts);
+                                cardsToCreate.push(...answersFromOtherContexts);
 
                                 let answersFromCurrentContext = utils.top(res.filter(x => x.score > config.qnaMinConfidence && x.context.id === currentContext.id), 3);
 
