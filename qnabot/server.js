@@ -109,10 +109,9 @@ function setupServer() {
         (session, args) => {
             builder.Prompts.text(session, `Welcome to QnA bot, you can ask questions and I\'ll look up relevant information for you.\
 
-            \n\nYou can find out what questions are available for your current conversation topic (once we\'ve started chatting) by typing \'questions\'.\
+            \n\nYou can find out what questions are available for your current conversation topic (once we\'ve started chatting) by typing \'questions\'.
 
-            \n\nYou can switch context at any time by typing \'@\' followed by the name of the condition you are interested in, for example \'@Toothache\' will allow you to ask\
-            questions about toothache if there is a match found for the condition in my records.\
+            \n\nYou can switch context at any time by typing \'@\' followed by the name of the condition you are interested in, for example \'@Toothache\' will allow you to ask questions about toothache if there is a match found for the condition in my records.\
 
             \n\nType \'help\' at any time to display this message again.`);
         },
@@ -226,31 +225,6 @@ function setupServer() {
         [
             (session, args) => {
                 let questionAsked = args;
-                if (questionAsked.charAt(0) === '@') {
-                    questionAsked = questionAsked.substring(1);
-                }
-                var questionSegments = questionAsked.split(':');
-
-                if (questionSegments.length > 1) {
-                    if (questionSegments[1].charAt(0) === ' ') {
-                        questionSegments[1] = questionSegments[1].substring(1).replace('?', '');
-                    }
-                    session.privateConversationData.lastQuestion = questionSegments[1];
-                    var contextWords = questionSegments[0].split(' ');
-
-                    var conditionWordInQuestion = false;
-                    for (var i = 0; i < contextWords.length; i++) {
-                        if (questionSegments[1].indexOf(contextWords[i]) !== -1) {
-                            conditionWordInQuestion = true;
-                        }
-                    }
-                    if (!conditionWordInQuestion) {
-                        questionAsked = questionSegments[1] + ' of ' + questionSegments[0];
-                    }
-                    else {
-                        questionAsked = questionSegments[1];
-                    }
-                }
 
                 session.privateConversationData.lastQuestion = questionAsked;
 
@@ -294,15 +268,7 @@ function setupServer() {
                 session.privateConversationData.lastQuestion = result.response;
                 return session.replaceDialog('FollowupQuestion', { question: result.response });
             }
-        ])
-        .triggerAction({
-            matches: /\@.*$/i,
-            onSelectAction: (session, args, next) => {
-                // Add the help dialog to the dialog stack 
-                // (override the default behavior of replacing the stack)
-                session.beginDialog(args.action, session.message.text);
-            }
-        });
+        ]);
 
     bot.dialog('SelectContext', [
         (session, args) => {
@@ -376,6 +342,10 @@ function setupServer() {
             (session, args) => {
                 if (args === undefined) {
                     return session.replaceDialog('NotFound');
+                }
+
+                if (args.question.charAt(0) === '@'){
+                    return session.replaceDialog('TopLevelQuestion', args.question.substring(1));
                 }
 
                 let questionAsked = args.question;
