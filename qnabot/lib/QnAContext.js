@@ -51,7 +51,7 @@ class QnAContext {
                                     questionMatched: ans.questions[0],
                                     score: ans.score,
                                     // The below replacements are temporary - ideally these issues should be fixed during preprocessing (other than the first one which is bot-specific)
-                                    entity: ans.answer.replace(/\n\n/g, '\n\n &nbsp; \n\n').replace(/\.\n/g, '.\n\n').replace(/\./g, '. ').replace(/\n\nPage \d of \d\n\n/g, '').replace(/[a-z]\n[A-Z]/g, function (match) {
+                                    entity: ans.answer.replace(/\n\n/g, '\n\n &nbsp; \n\n').replace(/\.\n/g, '.\n\n').replace(/\./g, '. ').replace(/\n\nPage \d of \d\n\n/g, '').replace(/Page \d of \d/g, '').replace(/[a-z]\n[A-Z]/g, function (match) {
                                         return match.replace('\n', '\n\n'); // Separate out subtitles
                                       }).replace(/[a-z]\n[a-z]/g, function (match) {  
                                           return match.replace('\n', ' '); // Lose random newlines from document wrapping
