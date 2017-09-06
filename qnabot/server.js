@@ -353,6 +353,7 @@ function setupServer() {
                 //Handle users selecting to change context for a followup question. 
                 if (args.context !== undefined) {
                     session.privateConversationData.selectedContext = args.context;
+                    session.privateConversationData.questionContexts = [ args.context ]; //Clear down all contexts other than the chosen one. 
                 }
 
                 let context = qna.QnAContext.fromState(session.privateConversationData.selectedContext);
@@ -433,7 +434,7 @@ function setupServer() {
                                 let attachments = [new builder.HeroCard(session)
                                     .text(`We've found some answers but we're not sure if they're a good fit, you may have changed topics.`)];
 
-                                let cardsToCreate = []
+                                let cardsToCreate =[]
                                 let answersFromOtherContexts = utils.top(res.filter(x => x.score > config.qnaMinConfidence && x.context.id !== currentContext.id), 3);
                                 cardsToCreate.push(...answersFromOtherContexts);
 
@@ -483,7 +484,7 @@ function setupServer() {
                     session.endDialog();
                 }
             )
-        }/* ,
+        },
         (session, result, args) => {
             let text = result.response;
             if (text.includes('@') && text.includes(':')) {
@@ -509,7 +510,7 @@ function setupServer() {
                 session.privateConversationData.lastQuestion = result.response;
                 return session.replaceDialog('FollowupQuestion', { question: result.response });
             }
-        } */
+        }
     ])
 }
 

@@ -50,7 +50,7 @@ class QnAContext {
                                     context: _this,
                                     questionMatched: ans.questions[0],
                                     score: ans.score,
-                                    entity: ans.answer,
+                                    entity: ans.answer.replace('\n', '\n\n'),
                                     type: 'answer',
                                     kbid: _this.kbid,
                                     name: _this.name,
