@@ -9,7 +9,7 @@ const utils = require('./lib/Utils');
 const sp = require('./lib/Spellcheck');
 
 const config = {
-    searchName: process.env.SEARH_NAME,
+    searchName: process.env.SEARCH_NAME,
     searchKey: process.env.SEARCH_KEY,
     searchIndexName: process.env.SEARCH_INDEX_NAME,
     storageConnectionString: process.env.BLOB_CONN_STRING,
