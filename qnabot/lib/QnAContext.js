@@ -24,9 +24,9 @@ class QnAContext {
 
     scoreQuestion(question) {
         return new Promise((resolve, reject) => {
-            let numberOfRespones = 3;
+            let numberOfResponses = 3;
             let _this = this;
-            var postBody = '{"question":"' + question + '", "top":' + numberOfRespones + '}';
+            var postBody = '{"question":"' + question + '", "top":' + numberOfResponses + '}';
             request({
                 url: 'https://westus.api.cognitive.microsoft.com/qnamaker/v2.0/knowledgebases/' + this.kbid + '/generateanswer',
                 method: 'POST',

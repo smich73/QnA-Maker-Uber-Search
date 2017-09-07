@@ -1,20 +1,16 @@
-var chokidar = require('chokidar');
+const chokidar = require('chokidar');
+const qnaUtils = require('./QnAUtils');
+const azTableUtils = require('./AzureTableUtils');
+
 var qnaCollection = [];
 var timer;
 timerActive = false;
 
-var filepath = os.environ["PDATA_DIR"];
-var subKey = '';
-var qnaURL = '';
-var tableConnStr = '';
-
-var request = require('request');
-var headers = {
-    'Ocp-Apim-Subscription-Key': subKey,
-    'Content-Type': 'application/json'
+const config = {
+    docFilepath: process.env.PDATA_DIR
 };
 
-var watcher = chokidar.watch(filepath);
+var watcher = chokidar.watch(docFilepath);
 watcher
     .on('add', path => process(path))
     .on('change', path => process(path));
@@ -42,12 +38,12 @@ function startTimer() {
         var qna = require(preprocessedDoc);
         console.log("Processing:", qna.name);
 
-        checkIfExists(qna, function(kbID){
+        azTableUtils.checkIfEntryExists(qna, function(kbID){
             if (kbID !== '') {
-                getQnA(kbID, function(response) {
+                qnaUtils.getQnA(kbID, function(response) {
                     if (response !== 'Error') {
                         var updates = getDiff(JSON.parse(response), qna);
-                        updateQnA(updates, kbID, function(response){
+                        qnaUtils.updateQnA(updates, kbID, function(response){
                             if (response !== 'Error') {
                                 console.log("Updated QnA:", qna.name, "QnAs left:", qnaCollection.length);
 
@@ -70,9 +66,9 @@ function startTimer() {
                 });
             }
             else {
-                createQnA(qna, function(response) {
+                qnaUtils.createQnA(qna, function(response) {
                     if (response !== 'Error') {
-                        createTableEntry(qna, response);
+                        azTableUtils.createTableEntry(qna, response);
                         console.log("Success:", qna.name, "QnAs left:", qnaCollection.length);
 
                         if (qnaCollection.length === 0) {
@@ -89,31 +85,6 @@ function startTimer() {
             }
         });
     }, 8000);
-}
-
-function checkIfExists(qna, callback) {
-    var azure = require('azure-storage');
-
-    var kbID = '';
-
-    var query = new azure.TableQuery()
-    .top(1)
-    .where('PartitionKey eq ?', 'Conditions').and('RowKey eq ?', qna.id);
-
-    var retryOperations = new azure.ExponentialRetryPolicyFilter();
-    var tableSvc = azure.createTableService(tableConnStr).withFilter(retryOperations);
-
-    tableSvc.queryEntities('newQnAIndex', query, null, function(error, result, response) {
-        if(!error) {
-          if (result.entries.length > 0) {
-              kbID = result.entries[0].KBID._;
-          }
-        }
-        else {
-            console.log("Error:", error.message);
-        }
-        callback(kbID);
-    });
 }
 
 function getDiff(existingQnA, newQnA) {
@@ -201,120 +172,6 @@ function getDiff(existingQnA, newQnA) {
     }
     else {
         console.log("QnA has no data. Deleting KB.");
-        deleteQnA(newQnA);
+        qnaUtils.deleteQnA(newQnA);
     }
-}
-
-function createQnA(qnaForUpload, callback) {
-    if (newQnA.qnaList.length > 0) {
-        // Configure the request
-        var options = {
-            url: qnaURL + 'create',
-            method: 'POST',
-            headers: headers,
-            json: qnaForUpload
-        };
-
-        // Start the request
-        request(options, function (error, response, body) {
-
-            if (!error && response.statusCode === 201) {
-                callback(body.kbId);
-            } else {
-                console.log("Error:", body, "Status code:", response.statusCode);
-                callback("Error");
-            }
-        });
-    }
-    else {
-        console.log("QnA has no data. QnAs left:", qnaCollection.length);
-        return;
-    }
-}
-
-function getQnA(kbID, callback) {
-    // Configure the request
-    var options = {
-        url: qnaURL + kbID,
-        method: 'GET',
-        headers: headers
-    };
-
-    // Start the request
-    request(options, function (error, response, body) {
-
-        if (!error && response.statusCode === 200) {
-            callback(body);
-        } else {
-            console.log("Error:", body, "Status code:", response.statusCode);
-            callback("Error");
-        }
-    });
-}
-
-function updateQnA(patch, kbID, callback) {
-    if (patch === 'No change') {
-        console.log("No change detected. QnAs left:", qnaCollection.length);
-        return;
-    }
-
-    // Configure the request
-    var options = {
-        url: qnaURL + kbID,
-        method: 'PATCH',
-        headers: headers,
-        json: patch
-    };
-
-    // Start the request
-    request(options, function (error, response, body) {
-
-        if (!error && response.statusCode === 204) {
-            callback(body);
-        } else {
-            console.log("Error:", body, "Status code:", response.statusCode);
-            callback("Error");
-        }
-    });
-}
-
-function deleteQnA(qna) {
-    // Configure the request
-    var options = {
-        url: qnaURL + kbID,
-        method: 'DELETE',
-        headers: headers
-    };
-
-    // Start the request
-    request(options, function (error, response, body) {
-
-        if (!error && response.statusCode === 204) {
-            console.log("Success: QnA deleted. QnA:", qna.name, "QnAs left:", qnaCollection.length);
-        } else {
-            console.log("Error:", body, "Status code:", response.statusCode);
-        }
-    });
-}
-
-function createTableEntry(qna, kbID) {
-
-    var azure = require('azure-storage');
-
-    var retryOperations = new azure.ExponentialRetryPolicyFilter();
-    var tableSvc = azure.createTableService(tableConnStr).withFilter(retryOperations);
-
-    var qnaEntry = {
-        PartitionKey: {'_': 'Conditions'},
-        RowKey: {'_': qna.id},
-        Condition: {'_': qna.name},
-        KBID: {'_': kbID},
-        DocURL: {'_': qna.source}
-    };
-
-    tableSvc.insertEntity('newQnAIndex', qnaEntry, function (error, result, response) {
-        if (error) {
-            console.log("Error inserting to Azure Table:", error.message);
-        }
-    });
 }
