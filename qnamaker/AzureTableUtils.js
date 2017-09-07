@@ -25,23 +25,35 @@ function createTableEntry(qna, kbID) {
     });
 }
 
-function checkIfEntryExists(qna, callback) {
-    var kbID = '';
+function checkIfEntryExists(qna) {
+    return new Promise((resolve, reject) => {
+        var kbID = '';
 
-    var query = new azure.TableQuery().top(1).where('PartitionKey eq ?', config.azTablePartitionKey).and('RowKey eq ?', qna.id);
+        var query = new azure.TableQuery().top(1).where('PartitionKey eq ?', config.azTablePartitionKey).and('RowKey eq ?', qna.id);
 
-    var retryOperations = new azureStorage.ExponentialRetryPolicyFilter();
-    var tableSvc = azureStorage.createTableService(config.storageConnectionString).withFilter(retryOperations);
+        var retryOperations = new azureStorage.ExponentialRetryPolicyFilter();
+        var tableSvc = azureStorage.createTableService(config.storageConnectionString).withFilter(retryOperations);
 
-    tableSvc.queryEntities(config.azTableName, query, null, function(error, result, response) {
-        if(!error) {
-          if (result.entries.length > 0) {
-              kbID = result.entries[0].KBID._;
-          }
-        }
-        else {
-            console.log("Error:", error.message);
-        }
-        callback(kbID);
+        tableSvc.queryEntities(config.azTableName, query, null, function(error, result, response) {
+            if(!error) {
+                if (result.entries.length > 0) {
+                    kbID = result.entries[0].KBID._;
+                }
+            }
+            else {
+                reject("Error:", error.message);
+            }
+            if (kbID !== '') {
+                resolve(kbID);
+            }
+            else {
+                reject("Entry not found.");
+            }
+        });
     });
 }
+
+module.exports = {
+    createTableEntry: createTableEntry,
+    checkIfEntryExists: checkIfEntryExists
+};
