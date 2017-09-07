@@ -16,7 +16,7 @@ const config = {
     lookupTableName: process.env.LOOKUP_TABLE_NAME,
     appId: process.env.MICROSOFT_APP_ID,
     appPassword: process.env.MICROSOFT_APP_PASSWORD,
-    qnaMakerEndpoint: "https://westus.api.cognitive.microsoft.com/qnamaker/v2.0/knowledgebases/",
+    qnaMakerEndpoint: process.env.QNAMAKER_ENDPOINT,
     qnaMakerKey: process.env.QNAMAKER_KEY,
     spellcheckEndpoint: process.env.SPELLCHECK_ENDPOINT,
     spellcheckMode: process.env.SPELLCHECK_MODE,
