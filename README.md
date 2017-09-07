@@ -89,3 +89,5 @@ The rough flow is as follows:
 * Complete testing of continuous processing for document updates. 
 * Assistive review process: flagging apparently anomalous questions/answers for human review. 
 * Integration with Ibex analytics dashboard to create an overview of document popularity, hit rate, top unanswerable questions etc. 
+* Add script to bulk delete QnAs from QnA Maker
+* Adapt QnA Maker scripts to run in Azure (perhaps as Azure Functions)
