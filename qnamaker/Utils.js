@@ -49,7 +49,8 @@ function getDiff(existingQnA, newQnA) {
             }
             // Modify existing questions in a QnA set
             if (change.kind === "A" && change.item.kind === "E" && change.path[0] === "qnaList" && change.path[2] === "questions") {
-                patch.update.qnaList.push({
+                patch.update.qnaList.push(
+                {
                     "qnaId": newQnA.qnaId,
                     "answer": newQnA.answer,
                     "source": newQnA.source,
