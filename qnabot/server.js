@@ -16,7 +16,7 @@ const config = {
     lookupTableName: process.env.LOOKUP_TABLE_NAME,
     appId: process.env.MICROSOFT_APP_ID,
     appPassword: process.env.MICROSOFT_APP_PASSWORD,
-    qnaMakerEndpoint: "https://westus.api.cognitive.microsoft.com/qnamaker/v2.0/knowledgebases/",
+    qnaMakerEndpoint: process.env.QNAMAKER_ENDPOINT,
     qnaMakerKey: process.env.QNAMAKER_KEY,
     spellcheckEndpoint: process.env.SPELLCHECK_ENDPOINT,
     spellcheckMode: process.env.SPELLCHECK_MODE,
@@ -147,7 +147,7 @@ function setupServer() {
                 contextDetails = 'Your current context is: @' + session.privateConversationData.selectedContext.name;
             }
 
-            builder.Prompts.text(session, 'I\'m QnA bot, you can ask questions and I\'ll look up relevant information for you.\n\n &nbsp; \n\nYou can find out what questions are available for your current conversation topic by typing \'questions\' at any time.\n\n &nbsp; \n\nYou can switch context at any time by typing \'@\' followed by the name of the condition you are interested in, for example \'@Toothache\' will allow you to ask questions about toothache if there is a match found for the condition in my records. ${contextDetails}.\n\n &nbsp; \n\nType \'help\' at any time to display this message again.');
+            builder.Prompts.text(session, `I\'m QnA bot, you can ask questions and I\'ll look up relevant information for you.\n\n &nbsp; \n\nYou can find out what questions are available for your current conversation topic by typing \'questions\' at any time.\n\n &nbsp; \n\nYou can switch context at any time by typing \'@\' followed by the name of the condition you are interested in, for example \'@Toothache\' will allow you to ask questions about toothache if there is a match found for the condition in my records. ${contextDetails}.\n\n &nbsp; \n\nType \'help\' at any time to display this message again.`);
         },
         (session, result, args) => {
             return session.replaceDialog('FollowupQuestion', { question: result.response });
