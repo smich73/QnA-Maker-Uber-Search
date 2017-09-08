@@ -85,6 +85,7 @@ The rough flow is as follows:
 
 ## Outstanding work
 
+* Create "Getting Started" and ARM templates for deployment.
 * Greater use of NLP in question extraction and document processing. 
 * Complete testing of continuous process for processing document updates. 
 * Assistive review process, flagging question or answers which seem to be anomalous for human review. 
